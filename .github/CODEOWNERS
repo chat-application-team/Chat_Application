@@ -1,0 +1,13 @@
+# models a serializers patří backend-db
+/server/**/models.py @org/backend-db
+/server/**/serializers.py @org/backend-db
+
+# users v server/ -> backend1
+/server/users/* @org/backend1
+
+# chat v server/ -> backend2
+/server/chat/* @org/backend2
+
+# Global default
+/server/* @org/backend1 @org/backend2 @org/backend-db
+/client/* @org/frontend1 @org/frontend2
