@@ -61,15 +61,29 @@ Aplikace je navržena tak, aby poskytovala bezpečné, přehledné a rychlé pro
 
 ```text
 Chat_Application/
+├── client/                 # Frontend (Vite + React)
+│  ├── src/
+│  │  ├── api/              # Axios instance a API volání
+│  │  ├── assets/           # Obrázky, ikony, globální styly
+│  │  ├── components/       # Znovupoužitelné UI komponenty (Button, Input, MessageBubble)
+│  │  ├── hooks/            # Vlastní React hooky (např. useAuth, useChat)
+│  │  ├── pages/            # Hlavní stránky (Login, Register, ChatRoom)
+│  │  ├── store/            # Správa stavu (Context API nebo Redux)
+│  │  ├── App.jsx           # Hlavní komponenta a definice routingu
+│  │  └── main.jsx          # Vstupní bod Reactu
+│  ├── public/              # Statické soubory
+│  ├── .gitignore           # Ignorované soubory pro frontend (node_modules, dist)
+│  ├── package.json         # Závislosti a skripty frontendu
+│  └── vite.config.js       # Konfigurace Vite
 ├─ server/
-│ ├─ config/ # Konfigurace Django projektu
-│ ├─ users/ # Modul pro uživatele (registrace, profily, role)
-│ └─ chat/ # Modul pro chat (zprávy, skupiny)
-├─ manage.py # Django management
-├─ requirements.txt # Závislosti projektu
-├─ README.md # Tento soubor
-├─ .gitignore # Ignorované soubory
-└─client/ # bude doplněno
+│ ├─ config/                # Konfigurace Django projektu
+│ ├─ users/                 # Modul pro uživatele (registrace, profily, role)
+│ └─ chat/                  # Modul pro chat (zprávy, skupiny)
+├─ manage.py                # Django management
+├─ requirements.txt         # Závislosti projektu
+├─ README.md                # Tento soubor
+└─ .gitignore               # Ignorované soubory
+
 ```
 ## Instalace a spuštění (lokální)
 
