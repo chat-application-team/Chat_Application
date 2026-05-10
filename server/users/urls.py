@@ -1,8 +1,51 @@
 from django.urls import path
-from .views import users_view, signIn_view, signUp_view
+
+from .views import (
+    RegisterView,
+    LoginView,
+    LogoutView,
+
+    MeView,
+    UpdateMeView,
+    DeleteMeView,
+
+    UsersListView,
+    UserDetailView,
+)
 
 urlpatterns = [
-    path('', users_view),
-    path('sign-in/', signIn_view, name="signin"),
-    path('sign-up/', signUp_view, name="signup"),
+    path(
+        "register/",
+        RegisterView.as_view()
+    ),
+    path(
+        "login/",
+        LoginView.as_view()
+    ),
+    path(
+        "logout/",
+        LogoutView.as_view()
+    ),
+
+    path(
+        "me/",
+        MeView.as_view()
+    ),
+    path(
+        "me/update/",
+        UpdateMeView.as_view()
+    ),
+    path(
+        "me/delete/",
+        DeleteMeView.as_view()
+    ),
+
+    path(
+        "",
+        UsersListView.as_view()
+    ),
+    path(
+        "<int:user_id>/",
+        UserDetailView.as_view()
+    ),
 ]
