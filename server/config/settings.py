@@ -137,3 +137,10 @@ STATIC_URL = 'static/'
 # CORS configuration
 
 CORS_ALLOWED_ORIGINS = get_list("CORS_ALLOWED_ORIGINS")
+
+
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': (
+        'rest_framework_simplejwt.authentication.JWTAuthentication',
+    )
+}
