@@ -1,35 +1,43 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
-import './App.css'
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { AuthProvider, useAuth } from './store/AuthContext';
+import Login from './pages/Login';
+import ChatDashboard from './pages/ChatDashboard';
+
+const ProtectedRoute = ({ children }) => {
+  const {isAuthenticated, loading } = useAuth();
+
+  if (loading) return <div className="p-8 text-center">Načítání aplikace...</div>;
+
+  return isAuthenticated ? children : <Navigate to="/login" />;
+};
 
 function App() {
-  const [count, setCount] = useState(0)
-
   return (
-    <>
-      <div>
-        <a href="https://vite.dev" target="_blank">
-          <img src={viteLogo} className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-      <h1>Vite + React</h1>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
-        <p>
-          Edit <code>src/App.jsx</code> and save to test HMR
-        </p>
-      </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
-    </>
-  )
+    <AuthProvider>
+      <BrowserRouter>
+        <Routes>
+          {/* Veřejná cesta pro přihlášení */}
+          <Route path="/login" element={<Login />} />
+          
+          {/* Změnil jsem hlavní cestu na /chat*/}
+          <Route 
+            path="/chat" 
+            element={
+              <ProtectedRoute>
+                <ChatDashboard />
+              </ProtectedRoute>
+            } 
+          />
+
+          {/* Přesměrování z kořene (/) rovnou na /chat */}
+          <Route path="/" element={<Navigate to="/chat" />} />
+
+          {/* ZÁCHYTNÁ SÍŤ: Cokoliv jiného hodí zpět na login (nebo ukáže 404) */}
+          <Route path="*" element={<Navigate to="/login" />} />
+        </Routes>
+      </BrowserRouter>
+    </AuthProvider>
+  );
 }
 
 export default App
