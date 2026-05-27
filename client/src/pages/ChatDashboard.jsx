@@ -1,36 +1,24 @@
 import { useState } from 'react';
 import { useAuth } from '../store/AuthContext';
+import useWebSocket from '../hooks/useWebSocket';
 
 function ChatDashboard() {
     const { user, logout } = useAuth();
-
     const [currentMessage, setCurrentMessage] = useState('');
+
+    const { messages, sendMessage } = useWebSocket('general');
 
     //test data
     const [contacts] = useState([
-        { id: 1, name: 'idk', isGroup: true, unread: 3 },
+        { id: 1, name: 'idk', isGroup: true, unread: 2 },
         { id: 2, name: 'idk2', isGroup: false, unread: 0 },
-    ]);
-
-    const [messages, setMessages] = useState([
-        { id: 1, text: 'sup dude', sender: 'filip', isMine: false, time: '66:66' },
-        { id: 2, text: 'sup dude', sender: 'filip', isMine: true, time: '68:69' },
     ]);
 
     const handleSendMessage = (e) => {
         e.preventDefault();
         if (!currentMessage.trim()) return;
 
-        //temp pro check
-        const newMessage = {
-            id: Date.now(),
-            text: currentMessage,
-            sender: user?.name || 'Ty',
-            isMine: true,
-            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-        };
-
-        setMessages([...messages, newMessage]);
+        sendMessage(currentMessage);
         setCurrentMessage('');
     };
 
@@ -112,6 +100,5 @@ function ChatDashboard() {
 
     </div>
   );
-};
-
+}
 export default ChatDashboard;
