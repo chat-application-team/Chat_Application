@@ -1,3 +1,19 @@
 from django.contrib import admin
 
-# Register your models here.
+from .models import (
+    Chat,
+    ChatMember,
+    Message,
+    Attachment,
+    Notification,
+    Report,
+    AuditLog
+)
+
+admin.site.register(Chat)
+admin.site.register(ChatMember)
+admin.site.register(Message)
+admin.site.register(Attachment)
+admin.site.register(Notification)
+admin.site.register(Report)
+admin.site.register(AuditLog)
