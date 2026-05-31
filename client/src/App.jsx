@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './store/AuthContext';
 import Login from './pages/Login';
 import ChatDashboard from './pages/ChatDashboard';
+import Register from './pages/Register';
 
 const ProtectedRoute = ({ children }) => {
   const {isAuthenticated, loading } = useAuth();
@@ -17,7 +18,8 @@ function App() {
       <BrowserRouter>
         <Routes>
           {/* Veřejná cesta pro přihlášení */}
-          <Route path="/login" element={<Login />} />
+          <Route path="/auth/login" element={<Login />} />
+          <Route path="/auth/register" element={<Register />} />
           
           {/* Změnil jsem hlavní cestu na /chat*/}
           <Route 
@@ -29,11 +31,11 @@ function App() {
             } 
           />
 
-          {/* Přesměrování z kořene (/) rovnou na /chat */}
+          {/* Přesměrování z / rovnou na /chat */}
           <Route path="/" element={<Navigate to="/chat" />} />
 
-          {/* ZÁCHYTNÁ SÍŤ: Cokoliv jiného hodí zpět na login (nebo ukáže 404) */}
-          <Route path="*" element={<Navigate to="/login" />} />
+          {/* Cokoliv jiného hodí zpátky na login (nebo ukáže 404) */}
+          <Route path="*" element={<Navigate to="/auth/login" />} />
         </Routes>
       </BrowserRouter>
     </AuthProvider>

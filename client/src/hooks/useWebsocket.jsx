@@ -3,6 +3,7 @@ import { useState, useEffect, useRef } from 'react';
 const useWebsocket = (roomName) => {
     //se co prijde ze serveru
     const [messages, setMessages] = useState([]);
+    const [friendRequests, setFriendRequests] = useState([]);
 
     const ws = useRef(null);
 
@@ -21,8 +22,21 @@ const useWebsocket = (roomName) => {
 
         ws.current.onmessage = (event) => {
             const incomingData = JSON.parse(event.data);
-            console.log('Přijatá zpráva:', incomingData);
-            setMessages((prevMessages) => [...prevMessages, incomingData]);
+
+            switch (incomingData.type) {
+                case 'CHAT_MESSAGE':
+                setMessages((prev) => [...prev, incomingData]);
+                break;
+
+                case 'FRIEND_REQUEST':
+                // Přidá novou žádost do našeho sdíleného seznamu
+                setFriendRequests((prev) => [...prev, incomingData]);
+                console.log('Nová žádost o přátelství!');
+                break;
+
+                default:
+                console.log('Neznámý typ zprávy:', incomingData);
+            }
         };
 
         ws.current.onerror = (error) => {
