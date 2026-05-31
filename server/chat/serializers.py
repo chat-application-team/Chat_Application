@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Chat, ChatMember, Message, Attachment
+from .models import Chat, ChatMember, Message, Attachment, Notification
 from users.models import CustomUser 
 
 class CustomUserSerializer(serializers.ModelSerializer):
@@ -18,9 +18,14 @@ class MessageSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Message
-        fields = ['id', 'chat', 'sender', 'content', 'created_at', 'is_read', 'attachments']
+        fields = ['id', 'chat', 'sender', 'content', 'type', 'created_at', 'is_read', 'read_at', 'edited_at', 'attachments']
 
 class ChatSerializer(serializers.ModelSerializer):
     class Meta:
         model = Chat
-        fields = ['id', 'type', 'name', 'image', 'last_activity']
+        fields = ['id', 'type', 'name', 'image', 'description', 'last_activity', 'created_at']
+
+class NotificationSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Notification
+        fields = ['id', 'user', 'type', 'content', 'is_read', 'created_at']

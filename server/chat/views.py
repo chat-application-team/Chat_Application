@@ -5,8 +5,8 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.exceptions import PermissionDenied
 from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
-from .models import Chat, ChatMember, Message
-from .serializers import ChatSerializer, MessageSerializer
+from .models import Chat, ChatMember, Message, Notification
+from .serializers import ChatSerializer, MessageSerializer, NotificationSerializer
 
 
 class UserChatsView(generics.ListAPIView):
@@ -38,11 +38,16 @@ class CreateMessageView(APIView):
             return Response({"error": "Nemáš přístup do tohoto chatu."}, status=403)
 
         content = request.data.get("content")
+        message_type = request.data.get("type", "text") 
+        
+        if not content or not content.strip():
+            return Response({"error": "Obsah zprávy nesmí být prázdný."}, status=400)
         
         message = Message.objects.create(
             chat_id=chat_id,
             sender=request.user,
-            content=content
+            content=content,
+            type=message_type
         )
 
         chat = message.chat
@@ -57,6 +62,7 @@ class CreateMessageView(APIView):
                 "message": {
                     "id": message.id,
                     "content": message.content,
+                    "type": message.type, 
                     "sender_id": request.user.id,
                     "username": request.user.username,
                     "created_at": str(message.created_at)
@@ -65,3 +71,11 @@ class CreateMessageView(APIView):
         )
 
         return Response({"status": "Odesláno", "message_id": message.id})
+
+
+class UserNotificationsView(generics.ListAPIView):
+    serializer_class = NotificationSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        return Notification.objects.filter(user=self.request.user, is_read=False)
