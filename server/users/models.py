@@ -1,39 +1,77 @@
 from django.contrib.auth.models import AbstractUser
+from django.core.exceptions import ValidationError
 from django.db import models
+from django.db.models import Q, F
+
+# =========================
+# USER ROLES
+# =========================
+
+ROLE_USER = 'user'
+ROLE_ADMIN = 'admin'
+
+# =========================
+# USER STATUS
+# =========================
+
+STATUS_ONLINE = 'online'
+STATUS_OFFLINE = 'offline'
+STATUS_DND = 'dnd'
+
+# =========================
+# RELATIONSHIP TYPES
+# =========================
+
+RELATIONSHIP_FRIEND = 'friend'
+RELATIONSHIP_REQUEST = 'request'
+RELATIONSHIP_BLOCK = 'block'
 
 
 class CustomUser(AbstractUser):
 
     ROLE_CHOICES = [
-        ('user', 'Běžný uživatel'),
-        ('admin', 'Administrátor'),
+        (ROLE_USER, 'Běžný uživatel'),
+        (ROLE_ADMIN, 'Administrátor'),
     ]
 
     role = models.CharField(
         max_length=20,
         choices=ROLE_CHOICES,
-        default='user'
+        default=ROLE_USER,
+        db_index=True
     )
 
-    created_at = models.DateTimeField(auto_now_add=True)
+    created_at = models.DateTimeField(
+        auto_now_add=True
+    )
+
+    last_seen = models.DateTimeField(
+        blank=True,
+        null=True
+    )
 
     class Meta:
         indexes = [
             models.Index(fields=['username']),
             models.Index(fields=['email']),
             models.Index(fields=['role']),
+            models.Index(fields=['last_seen']),
         ]
 
     def __str__(self):
         return self.username
 
+    @property
+    def profile_data(self):
+        return self.profile
+
 
 class Profile(models.Model):
 
     STATUS_CHOICES = [
-        ('online', 'Online'),
-        ('offline', 'Offline'),
-        ('dnd', 'Nerušit'),
+        (STATUS_ONLINE, 'Online'),
+        (STATUS_OFFLINE, 'Offline'),
+        (STATUS_DND, 'Nerušit'),
     ]
 
     user = models.OneToOneField(
@@ -56,10 +94,13 @@ class Profile(models.Model):
     status = models.CharField(
         max_length=20,
         choices=STATUS_CHOICES,
-        default='offline'
+        default=STATUS_OFFLINE,
+        db_index=True
     )
 
-    updated_at = models.DateTimeField(auto_now=True)
+    updated_at = models.DateTimeField(
+        auto_now=True
+    )
 
     class Meta:
         indexes = [
@@ -69,40 +110,67 @@ class Profile(models.Model):
     def __str__(self):
         return f'{self.user.username} Profile'
 
+    @property
+    def username(self):
+        return self.user.username
+
+    @property
+    def email(self):
+        return self.user.email
+
 
 class Relationship(models.Model):
 
     TYPE_CHOICES = [
-        ('friend', 'Přítel'),
-        ('request', 'Žádost o přátelství'),
-        ('block', 'Blokováno'),
+        (RELATIONSHIP_FRIEND, 'Přítel'),
+        (RELATIONSHIP_REQUEST, 'Žádost o přátelství'),
+        (RELATIONSHIP_BLOCK, 'Blokováno'),
     ]
 
-    user_a = models.ForeignKey(
+    sender = models.ForeignKey(
         CustomUser,
         on_delete=models.CASCADE,
-        related_name='rel_initiated'
+        related_name='relationships_sent'
     )
 
-    user_b = models.ForeignKey(
+    receiver = models.ForeignKey(
         CustomUser,
         on_delete=models.CASCADE,
-        related_name='rel_received'
+        related_name='relationships_received'
     )
 
     type = models.CharField(
         max_length=20,
-        choices=TYPE_CHOICES
+        choices=TYPE_CHOICES,
+        db_index=True
     )
 
-    created_at = models.DateTimeField(auto_now_add=True)
+    created_at = models.DateTimeField(
+        auto_now_add=True
+    )
 
     class Meta:
-        unique_together = ('user_a', 'user_b')
+
+        unique_together = ('sender', 'receiver')
+
+        constraints = [
+            models.CheckConstraint(
+                check=~Q(sender=F('receiver')),
+                name='prevent_self_relationship'
+            )
+        ]
 
         indexes = [
             models.Index(fields=['type']),
+            models.Index(fields=['created_at']),
         ]
 
+    def clean(self):
+
+        if self.sender == self.receiver:
+            raise ValidationError(
+                'User cannot create relationship with themselves.'
+            )
+
     def __str__(self):
-        return f'{self.user_a} -> {self.user_b} ({self.type})'
+        return f'{self.sender} -> {self.receiver} ({self.type})'

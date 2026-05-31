@@ -1,17 +1,51 @@
+from django.core.exceptions import ValidationError
 from django.db import models
+from django.db.models import Q, F
 from users.models import CustomUser
+
+# =========================
+# CHAT TYPES
+# =========================
+
+CHAT_PRIVATE = 'private'
+CHAT_GROUP = 'group'
+
+# =========================
+# CHAT MEMBER ROLES
+# =========================
+
+ROLE_OWNER = 'owner'
+ROLE_ADMIN = 'admin'
+ROLE_MEMBER = 'member'
+
+# =========================
+# MESSAGE TYPES
+# =========================
+
+MESSAGE_TEXT = 'text'
+MESSAGE_IMAGE = 'image'
+MESSAGE_GIF = 'gif'
+
+# =========================
+# NOTIFICATION TYPES
+# =========================
+
+NOTIFICATION_MESSAGE = 'message'
+NOTIFICATION_FRIEND_REQUEST = 'friend_request'
+NOTIFICATION_GROUP_INVITE = 'group_invite'
 
 
 class Chat(models.Model):
 
     TYPE_CHOICES = [
-        ('private', 'Soukromý'),
-        ('group', 'Skupinový'),
+        (CHAT_PRIVATE, 'Soukromý'),
+        (CHAT_GROUP, 'Skupinový'),
     ]
 
     type = models.CharField(
         max_length=20,
-        choices=TYPE_CHOICES
+        choices=TYPE_CHOICES,
+        db_index=True
     )
 
     name = models.CharField(
@@ -30,9 +64,14 @@ class Chat(models.Model):
         null=True
     )
 
-    last_activity = models.DateTimeField(auto_now=True)
+    last_activity = models.DateTimeField(
+        auto_now=True,
+        db_index=True
+    )
 
-    created_at = models.DateTimeField(auto_now_add=True)
+    created_at = models.DateTimeField(
+        auto_now_add=True
+    )
 
     class Meta:
         indexes = [
@@ -40,16 +79,27 @@ class Chat(models.Model):
             models.Index(fields=['last_activity']),
         ]
 
+    def clean(self):
+
+        if self.type == CHAT_GROUP and not self.name:
+            raise ValidationError(
+                'Group chat must have a name.'
+            )
+
     def __str__(self):
-        return self.name if self.name else f'Chat {self.id}'
+
+        if self.name:
+            return self.name
+
+        return f'Chat {self.id}'
 
 
 class ChatMember(models.Model):
 
     ROLE_CHOICES = [
-        ('owner', 'Vlastník'),
-        ('admin', 'Správce'),
-        ('member', 'Člen'),
+        (ROLE_OWNER, 'Vlastník'),
+        (ROLE_ADMIN, 'Správce'),
+        (ROLE_MEMBER, 'Člen'),
     ]
 
     chat = models.ForeignKey(
@@ -60,22 +110,28 @@ class ChatMember(models.Model):
 
     user = models.ForeignKey(
         CustomUser,
-        on_delete=models.CASCADE
+        on_delete=models.CASCADE,
+        related_name='chat_memberships'
     )
 
     role = models.CharField(
         max_length=20,
         choices=ROLE_CHOICES,
-        default='member'
+        default=ROLE_MEMBER,
+        db_index=True
     )
 
-    joined_at = models.DateTimeField(auto_now_add=True)
+    joined_at = models.DateTimeField(
+        auto_now_add=True
+    )
 
     class Meta:
+
         unique_together = ('chat', 'user')
 
         indexes = [
             models.Index(fields=['role']),
+            models.Index(fields=['joined_at']),
         ]
 
     def __str__(self):
@@ -85,9 +141,9 @@ class ChatMember(models.Model):
 class Message(models.Model):
 
     MESSAGE_TYPES = [
-        ('text', 'Text'),
-        ('image', 'Image'),
-        ('gif', 'GIF'),
+        (MESSAGE_TEXT, 'Text'),
+        (MESSAGE_IMAGE, 'Image'),
+        (MESSAGE_GIF, 'GIF'),
     ]
 
     chat = models.ForeignKey(
@@ -99,7 +155,8 @@ class Message(models.Model):
     sender = models.ForeignKey(
         CustomUser,
         on_delete=models.SET_NULL,
-        null=True
+        null=True,
+        related_name='sent_messages'
     )
 
     content = models.TextField()
@@ -107,12 +164,19 @@ class Message(models.Model):
     type = models.CharField(
         max_length=20,
         choices=MESSAGE_TYPES,
-        default='text'
+        default=MESSAGE_TEXT,
+        db_index=True
     )
 
-    created_at = models.DateTimeField(auto_now_add=True)
+    created_at = models.DateTimeField(
+        auto_now_add=True,
+        db_index=True
+    )
 
-    is_read = models.BooleanField(default=False)
+    is_read = models.BooleanField(
+        default=False,
+        db_index=True
+    )
 
     read_at = models.DateTimeField(
         blank=True,
@@ -125,12 +189,21 @@ class Message(models.Model):
     )
 
     class Meta:
+
         ordering = ['created_at']
 
         indexes = [
             models.Index(fields=['created_at']),
             models.Index(fields=['is_read']),
+            models.Index(fields=['type']),
         ]
+
+    def clean(self):
+
+        if not self.content.strip():
+            raise ValidationError(
+                'Message content cannot be empty.'
+            )
 
     def __str__(self):
         return f'Message {self.id}'
@@ -146,9 +219,14 @@ class Attachment(models.Model):
 
     file_url = models.URLField()
 
-    file_type = models.CharField(max_length=50)
+    file_type = models.CharField(
+        max_length=50,
+        db_index=True
+    )
 
-    uploaded_at = models.DateTimeField(auto_now_add=True)
+    uploaded_at = models.DateTimeField(
+        auto_now_add=True
+    )
 
     class Meta:
         indexes = [
@@ -162,9 +240,9 @@ class Attachment(models.Model):
 class Notification(models.Model):
 
     TYPE_CHOICES = [
-        ('message', 'Zpráva'),
-        ('friend_request', 'Žádost'),
-        ('group_invite', 'Pozvánka'),
+        (NOTIFICATION_MESSAGE, 'Zpráva'),
+        (NOTIFICATION_FRIEND_REQUEST, 'Žádost'),
+        (NOTIFICATION_GROUP_INVITE, 'Pozvánka'),
     ]
 
     user = models.ForeignKey(
@@ -175,20 +253,28 @@ class Notification(models.Model):
 
     type = models.CharField(
         max_length=50,
-        choices=TYPE_CHOICES
+        choices=TYPE_CHOICES,
+        db_index=True
     )
 
     content = models.TextField()
 
-    is_read = models.BooleanField(default=False)
+    is_read = models.BooleanField(
+        default=False,
+        db_index=True
+    )
 
-    created_at = models.DateTimeField(auto_now_add=True)
+    created_at = models.DateTimeField(
+        auto_now_add=True
+    )
 
     class Meta:
+
         ordering = ['-created_at']
 
         indexes = [
             models.Index(fields=['is_read']),
+            models.Index(fields=['created_at']),
         ]
 
     def __str__(self):
@@ -211,7 +297,25 @@ class Report(models.Model):
 
     reason = models.TextField()
 
-    created_at = models.DateTimeField(auto_now_add=True)
+    created_at = models.DateTimeField(
+        auto_now_add=True
+    )
+
+    class Meta:
+
+        constraints = [
+            models.CheckConstraint(
+                check=~Q(reporter=F('target')),
+                name='prevent_self_report'
+            )
+        ]
+
+    def clean(self):
+
+        if self.reporter == self.target:
+            raise ValidationError(
+                'User cannot report themselves.'
+            )
 
     def __str__(self):
         return f'Report {self.id}'
@@ -221,15 +325,23 @@ class AuditLog(models.Model):
 
     admin = models.ForeignKey(
         CustomUser,
-        on_delete=models.CASCADE
+        on_delete=models.CASCADE,
+        related_name='admin_logs'
     )
 
     action = models.TextField()
 
-    created_at = models.DateTimeField(auto_now_add=True)
+    created_at = models.DateTimeField(
+        auto_now_add=True
+    )
 
     class Meta:
+
         ordering = ['-created_at']
+
+        indexes = [
+            models.Index(fields=['created_at']),
+        ]
 
     def __str__(self):
         return self.action
