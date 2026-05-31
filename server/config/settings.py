@@ -48,6 +48,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     # Third-party apps
     'rest_framework',
+    'django_filters',
     'corsheaders',
     # Local apps
     'users',
@@ -137,3 +138,10 @@ STATIC_URL = 'static/'
 # CORS configuration
 
 CORS_ALLOWED_ORIGINS = get_list("CORS_ALLOWED_ORIGINS")
+
+# Databases - uživatelský model (napojení na CustomUser v users/models.py)
+AUTH_USER_MODEL = 'users.CustomUser'
+
+# media
+MEDIA_URL = "/media/"
+MEDIA_ROOT = os.path.join(BASE_DIR, "media")
