@@ -62,6 +62,8 @@ class UserSerializer(serializers.ModelSerializer):
             "id",
             "username",
             "email",
+            "first_name",
+            "last_name",
             "role",
             "role_display",
             "date_joined",
@@ -135,9 +137,13 @@ class UserAdminSerializer(serializers.ModelSerializer):
             "id",
             "username",
             "email",
+            "first_name",
+            "last_name",
             "role",
             "role_display",
             "date_joined",
+            "is_active",
+            "last_login"
         ]
 
 class ProfileUpdateSerializer(serializers.ModelSerializer):
@@ -146,8 +152,21 @@ class ProfileUpdateSerializer(serializers.ModelSerializer):
         
         fields = [
             "bio",
-            "avatar"
+            "avatar",
+            "status"
         ]
+
+    def validate_status(self, value):
+        allowed_statuses = [Profile.DND, Profile.ONLINE]
+
+        normalized_value = value.lower() if value else value
+
+        if normalized_value not in allowed_statuses:
+            raise serializers.ValidationError(
+                f"Invalid status. Allowed values are only {" or ".join(allowed_statuses)}."
+            )
+        
+        return normalized_value
 
 class UpdateUserSerializer(serializers.ModelSerializer):
     profile = ProfileUpdateSerializer()

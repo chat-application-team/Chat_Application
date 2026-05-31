@@ -28,6 +28,11 @@ from .serializers import (
     UserFriendsSerializer
 )
 
+from chat.models import (
+    Message,
+    Chat
+)
+
 from django.db.models import Q
 
 from django.utils import timezone
@@ -54,12 +59,12 @@ class RegisterView(APIView):
     def post(self, request):
         serializer = RegisterSerialzer(data=request.data)
         if serializer.is_valid():
-            serializer.save()
+            user = serializer.save()
 
             AuditLog.objects.create(
-                user=request.user,
+                user=user,
                 action_type=AuditLog.USER_REGISTER,
-                action=f"User {request.user.username} has successfully registered."
+                action=f"User {user.username} has successfully registered."
             )
 
             return Response(
@@ -276,41 +281,6 @@ class MyBlockedUsersView(APIView):
         serializer = BlockedUserSerializer(blocked_users, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
     
-    def delete(self, request):
-        me = request.user
-        target_id = request.data.get("user_id")
-
-        if not target_id:
-            return Response(
-                {"error":"You must specify 'user_id' parameter to unblock."},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        
-        relationship = Relationship.objects.filter(
-            user_a=me,
-            user_b=target_id,
-            type=Relationship.BLOCK
-        ).first()
-
-        if not relationship:
-            return Response(
-                {"error":"No blocked relationship found with this user."},
-                status=status.HTTP_404_NOT_FOUND
-            )
-        
-        relationship.delete()
-
-        AuditLog.objects.create(
-            user=me,
-            action_type=AuditLog.USER_UNBLOCK,
-            action=f"User {me.username} unblocked user ID {target_id} from their block list."
-        )
-
-        return Response(
-            {"message":"User has been successfully unblocked."},
-            status=status.HTTP_200_OK
-        )
-    
 # users
 
 class UsersListView(APIView):
@@ -329,6 +299,7 @@ class UsersListView(APIView):
         for a, b in blocked_user_ids:
             exclude_ids.add(a)
             exclude_ids.add(b)
+        exclude_ids.add(me.id)
 
         users = User.objects.filter(is_active=True).exclude(id__in=exclude_ids).select_related("profile")
 
@@ -400,6 +371,33 @@ class UserFriendsListView(APIView):
 class FriendRequestView(APIView):
     permission_classes = [IsAuthenticated]
 
+    def get(self, request):
+        me = request.user
+
+        requestsSend = Relationship.objects.filter(
+            Q(user_a=me),
+            type=Relationship.REQUEST
+        ).values_list("user_b", flat=True)
+
+        requestsRecieved = Relationship.objects.filter(
+            Q(user_b=me),
+            type=Relationship.REQUEST
+        ).values_list("user_a", flat=True)
+
+        users_send = User.objects.filter(id__in=requestsSend).select_related("profile")
+        users_recieved = User.objects.filter(id__in=requestsRecieved).select_related("profile")
+
+        serializerSend = UserFriendsSerializer(users_send, many=True)
+        serializerRecieved = UserFriendsSerializer(users_recieved, many=True)
+
+        return Response(
+            {
+                "send":serializerSend.data,
+                "recieved":serializerRecieved.data
+            },
+            status=status.HTTP_200_OK
+        )
+
     def post(self, request):
         me = request.user
         target_id = request.data.get("user_id")
@@ -455,6 +453,51 @@ class FriendRequestView(APIView):
             {"message":"Friend request has been accepted."}
         )
     
+class RelationsDeleteView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def delete(self, request, user_id):
+        me = request.user
+
+        rel = Relationship.objects.filter(
+            (Q(user_a=me) & Q(user_b_id=user_id)) |
+            (Q(user_a_id=user_id) & Q(user_b=me))
+        ).exclude(
+            Q(user_b=me),
+            type=Relationship.BLOCK
+        ).first()
+
+        if not rel:
+            return Response(
+                {"error":f"No relationship found."},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        type = rel.type
+
+        rel.delete()
+
+        match type:
+            case Relationship.FRIEND:
+                action_type = AuditLog.FRIEND_REMOVED
+                list_type = "friend"
+            case Relationship.BLOCK:
+                action_type = AuditLog.USER_UNBLOCK
+                list_type = "block"
+            case Relationship.REQUEST | _:
+                action_type = AuditLog.REQUEST_REMOVED
+                list_type = "request"
+
+        AuditLog.objects.create(
+            user=me,
+            action_type=action_type,
+            action=f"User {me.username} removed User ID {user_id} from their {list_type} list."
+        )
+
+        return Response(
+            {"message":f"User has been successfully removed from {list_type} list."}
+        )
+
 class BlockUserView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -551,6 +594,9 @@ class AdminDashboardStatsView(APIView):
             "active_users": User.objects.filter(is_active=True).count(),
             "admins_count": User.objects.filter(role=User.ADMIN).count(),
             "new_users_today": User.objects.filter(date_joined__date=dnes).count(),
+            "messages_count":Message.objects.count(),
+            "dm_count":Chat.objects.filter(type=Chat.PRIVATE).count(),
+            "group_chat_count":Chat.objects.filter(type=Chat.GROUP).count(),
         }
         return Response(stats)
 

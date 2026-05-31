@@ -11,14 +11,15 @@ from .views import (
     ChangePasswordView,
     DeleteMeView,
     PingUserView,
-    BlockUserView,
+    MyBlockedUsersView,
 
     UsersListView,
     UserDetailView,
 
     UserFriendsListView,
     FriendRequestView,
-    MyBlockedUsersView,
+    RelationsDeleteView,
+    BlockUserView,
 
     AdminUserManagementViewSet,
     AdminAuditLogViewSet,
@@ -90,8 +91,12 @@ urlpatterns = [
         UserFriendsListView.as_view()
     ),
     path(
-        "relations/request/",
+        "relations/requests/",
         FriendRequestView.as_view()
+    ),
+    path(
+        "relations/delete/<int:user_id>/",
+        RelationsDeleteView.as_view()
     ),
     path(
         "relations/block/",

@@ -158,6 +158,8 @@ class AuditLog(models.Model):
     USER_BLOCK = "user_block"
     USER_UNBLOCK = "user_unblock"
     FRIEND_ACCEPT = "friend_accept"
+    FRIEND_REMOVED = "friend_removed"
+    REQUEST_REMOVED = "request_removed"
     ROLE_CHANGE = "role_change"
     PROFILE_UPDATE = "profile_update"
     ADMIN_CREATE_USER = "admin_create_user"

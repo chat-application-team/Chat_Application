@@ -3,9 +3,11 @@ from users.models import CustomUser
 
 class Chat(models.Model):
 
+    PRIVATE = 'private'
+    GROUP = 'group'
     TYPE_CHOICES = [
-        ('private', 'Soukromý'),
-        ('group', 'Skupinový'),
+        (PRIVATE, 'Soukromý'),
+        (GROUP, 'Skupinový'),
     ]
 
     type = models.CharField(
