@@ -3,43 +3,13 @@ from django.db import models
 from django.db.models import Q, F
 from users.models import CustomUser
 
-# =========================
-# CHAT TYPES
-# =========================
-
-CHAT_PRIVATE = 'private'
-CHAT_GROUP = 'group'
-
-# =========================
-# CHAT MEMBER ROLES
-# =========================
-
-ROLE_OWNER = 'owner'
-ROLE_ADMIN = 'admin'
-ROLE_MEMBER = 'member'
-
-# =========================
-# MESSAGE TYPES
-# =========================
-
-MESSAGE_TEXT = 'text'
-MESSAGE_IMAGE = 'image'
-MESSAGE_GIF = 'gif'
-
-# =========================
-# NOTIFICATION TYPES
-# =========================
-
-NOTIFICATION_MESSAGE = 'message'
-NOTIFICATION_FRIEND_REQUEST = 'friend_request'
-NOTIFICATION_GROUP_INVITE = 'group_invite'
-
-
 class Chat(models.Model):
 
+    PRIVATE = 'private'
+    GROUP = 'group'
     TYPE_CHOICES = [
-        (CHAT_PRIVATE, 'Soukromý'),
-        (CHAT_GROUP, 'Skupinový'),
+        (PRIVATE, 'Soukromý'),
+        (GROUP, 'Skupinový'),
     ]
 
     type = models.CharField(
@@ -81,7 +51,7 @@ class Chat(models.Model):
 
     def clean(self):
 
-        if self.type == CHAT_GROUP and not self.name:
+        if self.type == Chat.GROUP and not self.name:
             raise ValidationError(
                 'Group chat must have a name.'
             )
@@ -96,6 +66,9 @@ class Chat(models.Model):
 
 class ChatMember(models.Model):
 
+    ROLE_OWNER = 'owner'
+    ROLE_ADMIN = 'admin'
+    ROLE_MEMBER = 'member'
     ROLE_CHOICES = [
         (ROLE_OWNER, 'Vlastník'),
         (ROLE_ADMIN, 'Správce'),
@@ -140,6 +113,9 @@ class ChatMember(models.Model):
 
 class Message(models.Model):
 
+    MESSAGE_TEXT = 'text'
+    MESSAGE_IMAGE = 'image'
+    MESSAGE_GIF = 'gif'
     MESSAGE_TYPES = [
         (MESSAGE_TEXT, 'Text'),
         (MESSAGE_IMAGE, 'Image'),
@@ -189,7 +165,6 @@ class Message(models.Model):
     )
 
     class Meta:
-
         ordering = ['created_at']
 
         indexes = [
@@ -239,6 +214,9 @@ class Attachment(models.Model):
 
 class Notification(models.Model):
 
+    NOTIFICATION_MESSAGE = 'message'
+    NOTIFICATION_FRIEND_REQUEST = 'friend_request'
+    NOTIFICATION_GROUP_INVITE = 'group_invite'
     TYPE_CHOICES = [
         (NOTIFICATION_MESSAGE, 'Zpráva'),
         (NOTIFICATION_FRIEND_REQUEST, 'Žádost'),
