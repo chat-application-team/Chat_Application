@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../store/AuthContext';
-import useWebSocket from '../hooks/useWebSocket';
+import { useWebSocket } from '../hooks/useWebSocket';
 import { chatService } from '../api/chatService';
 import { userService } from '../api/userService';
 import { socialService } from '../api/socialService';
@@ -8,10 +8,13 @@ import Profile from '../components/Profile';
 import CreateGroup from '../components/CreateGroup';
 import GroupInfo from '../components/GroupInfo';
 import Friends from '../components/Friends';
+import AdminDashboard from './AdminDashboard';
 
 function ChatDashboard() {
     const { user, logout } = useAuth();
     const [currentMessage, setCurrentMessage] = useState('');
+
+    const [showAdmin, setShowAdmin] = useState(false);
 
     const [conversations, setConversations] = useState([]);
     const [activeChat, setActiveChat] = useState(null);
@@ -39,17 +42,30 @@ function ChatDashboard() {
       messages: 0
     });
 
-    const { sendMessage: sendChatMessage } = useWebSocket(activeChat ? `room_${activeChat.id}` : null);
+    //websocket handlery
+    const handleNewMessage = (msg) => setMessages(prev => [...prev, msg]);
+
+    const handleNewFriendRequest = (req) => {
+      setFriendRequests(prev => [...prev, req]);
+      setNotifications(prev => ({ ...prev, friendRequests: prev.friendRequests + 1 }));
+    };
+
+    const handleSystemAction = (actionData) => {
+      if (actionData.action === 'FORCE_LOGOUT') {
+        alert(`Byl jsi odpojen administrátorem: ${actionData.reason}`);
+        logout(); // Vykopne uživatele do loginu
+      }
+    };
+
+    const { sendMessage } = useWebSocket(user, handleNewMessage, handleNewFriendRequest, handleSystemAction);
 
     //načítání konverzací při načtení komponenty
     useEffect(() => {
       const fetchData = async () => {
         try {
-          // Načte konverzace pro chat
           const chatData = await chatService.getConversations();
           setConversations(chatData || []);
           
-          // Načte žádosti o přátelství
           const initialRequests = await socialService.getPendingRequests();
           console.log("Stažené žádosti v Dashboardu:", initialRequests);
           setFriendRequests(initialRequests || []);
@@ -57,7 +73,7 @@ function ChatDashboard() {
           console.error("Chyba při načítání dat:", error);
         }
       };
-    fetchData();
+      fetchData();
     }, []);
 
   //Funkce, která se spustí při každém napsaném písmenku do vyhledávání
@@ -78,18 +94,14 @@ function ChatDashboard() {
 
       //temp
       console.log("Posílám žádost o přátelství pro ID:", userId);
-      setSentRequests(prev => new Set(prev).add(userId)); //Tlačítko se změní na odesláno
+      setSentRequests(prev => new Set(prev).add(userId)); 
 
-      /*s backendem
+      /*backend
       try {
-        // Předpokládáme, že funkce v socialService rovnou volá axiosClient.post(...)
         await socialService.sendFriendRequest(userId);
-        
-        // Uložíme si ID, abychom uživateli ukázali, že žádost odešla
         setSentRequests(prev => new Set(prev).add(userId));
       } catch (error) {
         console.error("Chyba při odesílání žádosti:", error);
-        // Zde by mohlo být zobrazení chybové hlášky, např. setError('Nelze odeslat žádost')
       }*/
     };
 
@@ -111,12 +123,11 @@ function ChatDashboard() {
     };
 
     const handleImageChange = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      //z lokalu
-      const imageUrl = URL.createObjectURL(file);
-      setSelectedImage(imageUrl);
-    }
+      const file = e.target.files[0];
+      if (file) {
+        const imageUrl = URL.createObjectURL(file);
+        setSelectedImage(imageUrl);
+      }
     };
 
     const handleSendMessage = (e) => {
@@ -124,26 +135,41 @@ function ChatDashboard() {
       if (!currentMessage.trim() && !selectedImage) return;
 
       const newMessage = {
+        type: 'CHAT_MESSAGE',
+        chatId: activeChat?.id,
+        senderId: user?.id,
         text: currentMessage,
-        image: selectedImage,
-        isMine: true
-      }
+        image: selectedImage
+      };
 
+      //temp
+      setMessages(prev => [...prev, { ...newMessage, isMine: true }]);
+
+      /*backend
       try {
-        sendMessage(JSON.stringify(newMessage)); 
+        sendMessage(newMessage); 
+        //nebo pokud chceš nejdřív poslat na backend a pak přes WS:
+        await chatService.sendMessage(newMessage);
       } catch (error) {
-        console.log('WebSocket odeslání selhalo (čeká na backend), ale zpráva se vykreslí.', error);
-      }
-
-      setMessages([...messages, newMessage]);
+        console.error('Chyba při odesílání zprávy:', error);
+      }*/
 
       setCurrentMessage('');
       setSelectedImage(null);
       setShowEmojiPicker(false); 
     };
 
+    if (showAdmin) {
+      return (
+        <AdminDashboard 
+          onBack={() => setShowAdmin(false)} 
+          sendWebSocketMessage={sendMessage}
+        />
+      );
+    }
+
     return (
-    <div className="flex h-screen bg-gray-100 font-sans">
+      <div className="flex h-screen bg-gray-100 font-sans">
       
       {/* --- LEVÝ PANEL --- */}
       <div className="w-1/4 bg-white border-r border-gray-300 flex flex-col">
@@ -155,12 +181,18 @@ function ChatDashboard() {
             <p className="text-xs text-gray-600">Přihlášen: {user?.username || 'Uživatel'}</p>
           </div>
           <div className="flex space-x-2">
+            {/*if (user.role === 'admin') {*/}
+            <button 
+              onClick={() => setShowAdmin(true)} 
+              className="text-sm bg-purple-100 text-purple-700 px-3 py-1 rounded hover:bg-purple-200 transition font-medium"
+            >
+              Admin
+            </button>
             <button 
               onClick={() => setIsFriendsOpen(true)} 
               className="relative text-sm bg-blue-100 text-blue-700 px-3 py-1 rounded hover:bg-blue-200 transition font-medium"
             >
               Přátelé
-              {/* Zde je ta skutečná globální notifikace! */}
               {friendRequests.length > 0 && (
                 <span className="absolute -top-2 -right-2 bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full shadow-sm">
                   {friendRequests.length}
@@ -193,7 +225,6 @@ function ChatDashboard() {
         {/* Seznam chatů / Výsledky hledání */}
         <div className="flex-1 overflow-y-auto p-2 space-y-1">
           {searchQuery.trim() !== '' ? (
-            // Výsledky hledání se žádostí o přátelství
             searchResults.length === 0 ? (
               <p className="text-center text-gray-400 text-sm mt-4">Nenalezen žádný uživatel</p>
             ) : (
@@ -218,7 +249,6 @@ function ChatDashboard() {
               })
             )
           ) : (
-            // Běžné chaty
             conversations.length === 0 ? (
                <p className="text-center text-gray-400 text-sm mt-4">Žádné konverzace</p>
             ) : (
@@ -355,8 +385,6 @@ function ChatDashboard() {
         )}
       </div>
 
-      {/* --- MODÁLY (Okna) --- */}
-      {/* Poznámka: Pokud jsi nahoře v importech použil např. jen 'import Profile from...', odmaž u těch komponent slovo 'Modal' */}
       {isProfileOpen && <Profile onClose={() => setIsProfileOpen(false)} />}
       
       {isGroupOpen && (
@@ -391,4 +419,5 @@ function ChatDashboard() {
     </div>
   );
 }
+
 export default ChatDashboard;

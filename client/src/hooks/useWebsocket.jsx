@@ -1,66 +1,53 @@
-import { useState, useEffect, useRef } from 'react';
+import { useEffect, useRef } from 'react';
 
-const useWebsocket = (roomName) => {
-    //se co prijde ze serveru
-    const [messages, setMessages] = useState([]);
-    const [friendRequests, setFriendRequests] = useState([]);
+export const useWebSocket = (user, onMessageReceived, onFriendRequest, onSystemAction) => {
+  const ws = useRef(null);
 
-    const ws = useRef(null);
+  useEffect(() => {
+    if (!user) return; // Nepřipojujeme se, pokud není uživatel přihlášen
 
-    useEffect(() => {
-        if (!roomName) return;
+    /* --- PŘÍPRAVA NA BACKEND: Skutečná WS adresa ---
+    // Adresa bude pravděpodobně obsahovat token nebo ID uživatele pro ověření
+    // const WS_URL = `ws://localhost:3000?token=${user.token}`; 
+    ------------------------------------------------ */
+    const WS_URL = 'ws://localhost:8080'; // Dočasná lokální adresa pro testování
+    
+    ws.current = new WebSocket(WS_URL);
 
-        const token = localStorage.getItem('accessToken');
+    ws.current.onopen = () => console.log('WebSocket připojen!');
+    ws.current.onclose = () => console.log('WebSocket odpojen!');
+    
+    ws.current.onmessage = (event) => {
+      const data = JSON.parse(event.data);
+      console.log('WS přijato:', data);
 
-        const wsUrl = `ws://127.0.0.1:8000/ws/chat/${roomName}/?token=${token}`;
-
-        ws.current = new WebSocket(wsUrl);
-
-        ws.current.onopen = () => {
-            console.log('WebSocket připojen');
-        };
-
-        ws.current.onmessage = (event) => {
-            const incomingData = JSON.parse(event.data);
-
-            switch (incomingData.type) {
-                case 'CHAT_MESSAGE':
-                setMessages((prev) => [...prev, incomingData]);
-                break;
-
-                case 'FRIEND_REQUEST':
-                // Přidá novou žádost do našeho sdíleného seznamu
-                setFriendRequests((prev) => [...prev, incomingData]);
-                console.log('Nová žádost o přátelství!');
-                break;
-
-                default:
-                console.log('Neznámý typ zprávy:', incomingData);
-            }
-        };
-
-        ws.current.onerror = (error) => {
-            console.error('WebSocket chyba:', error);
-        };
-
-        return () => {
-            if (ws.current) {
-                ws.current.close();
-            }
-        };
-    }, [roomName]);
-
-    const sendMessage = (message) => {
-        if (ws.current && ws.current.readyState === WebSocket.OPEN) {
-            ws.current.send(JSON.stringify({
-                text: message,
-            }));
-        } else {
-            console.warn('Socket není připojen');
-        }
+      switch (data.type) {
+        case 'CHAT_MESSAGE':
+          if (onMessageReceived) onMessageReceived(data);
+          break;
+        case 'FRIEND_REQUEST':
+          if (onFriendRequest) onFriendRequest(data);
+          break;
+        case 'SYSTEM_ACTION':
+          if (onSystemAction) onSystemAction(data);
+          break;
+        default:
+          console.warn('Neznámý typ WS zprávy:', data);
+      }
     };
 
-    return { messages, setMessages };
-};
+    return () => {
+      if (ws.current) ws.current.close();
+    };
+  }, [user]);
 
-export default useWebsocket;
+  const sendMessage = (msgObj) => {
+    if (ws.current && ws.current.readyState === WebSocket.OPEN) {
+      ws.current.send(JSON.stringify(msgObj));
+    } else {
+      console.error('WebSocket není připojen!');
+    }
+  };
+
+  return { sendMessage };
+};
