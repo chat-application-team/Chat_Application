@@ -185,55 +185,55 @@ class AddGroupMemberView(APIView):
         return Response({"status": f"Uživatel {user_to_add.username} byl úspěšně přidán do chatu."})
     
 
-    class LeaveGroupView(APIView):
-        permission_classes = [IsAuthenticated]
+class LeaveGroupView(APIView):
+    permission_classes = [IsAuthenticated]
 
-        def post(self, request, chat_id):
-            try:
-                chat = Chat.objects.get(id=chat_id)
-            except Chat.DoesNotExist:
-                return Response({"error": "Chat neexistuje."}, status=404)
+    def post(self, request, chat_id):
+        try:
+            chat = Chat.objects.get(id=chat_id)
+        except Chat.DoesNotExist:
+            return Response({"error": "Chat neexistuje."}, status=404)
             
-            if chat.type != 'group':
-                return Response({"error": "Ze soukromého chatu nelze odejít."}, status=400)
+        if chat.type != 'group':
+            return Response({"error": "Ze soukromého chatu nelze odejít."}, status=400)
             
-            try:
-                member = ChatMember.objects.get(chat=chat, user=request.user)
+        try:
+            member = ChatMember.objects.get(chat=chat, user=request.user)
 
-            except ChatMember.DoesNotExist:
-                return Response({"error": "Nejsi členem této skupiny."}, status=403)
+        except ChatMember.DoesNotExist:
+            return Response({"error": "Nejsi členem této skupiny."}, status=403)
             
-            if member.role == 'owner':
-                other_members_count = ChatMember.objects.filter(chat=chat).exclude(user=request.user).count()
-                if other_members_count == 0:
-                    return Response({"error": "Jako Vlastník nemůžeš odejít, dokud na někoho nepřevedeš vlastnictví nebo dokud nezrušíš skupinu."}, status=403)
+        if member.role == 'owner':
+            other_members_count = ChatMember.objects.filter(chat=chat).exclude(user=request.user).count()
+            if other_members_count == 0:
+                return Response({"error": "Jako Vlastník nemůžeš odejít, dokud na někoho nepřevedeš vlastnictví nebo dokud nezrušíš skupinu."}, status=403)
 
-            member.delete()
+        member.delete()
 
-            return Response({"status": "Úspěšně jsi opustil skupinu."})
+        return Response({"status": "Úspěšně jsi opustil skupinu."})
         
     
-    class DeleteChatView(APIView):
-        permission_classes = [IsAuthenticated]
+class DeleteChatView(APIView):
+    permission_classes = [IsAuthenticated]
 
-        def delete(self, request, chat_id):
-            try:
-                chat = Chat.objects.get(id=chat_id)
-                
-            except Chat.DoesNotExist:
-                return Response({"error": "Chat neexistuje."}, status=404)
+    def delete(self, request, chat_id):
+        try:
+            chat = Chat.objects.get(id=chat_id)
+
+        except Chat.DoesNotExist:
+            return Response({"error": "Chat neexistuje."}, status=404)
             
-            try:
-                member = ChatMember.objects.get(chat=chat, user=request.user)
+        try:
+            member = ChatMember.objects.get(chat=chat, user=request.user)
             
-            except ChatMember.DoesNotExist:
-                return Response({"error": "Nejsi členem tohoto chatu."}, status=403)
+        except ChatMember.DoesNotExist:
+            return Response({"error": "Nejsi členem tohoto chatu."}, status=403)
             
-            if chat.type == 'group' and member.role != 'owner':
-                return Response({"error": "Pouze Vlastník může smazat skupinový chat."}, status=403)
+        if chat.type == 'group' and member.role != 'owner':
+            return Response({"error": "Pouze Vlastník může smazat skupinový chat."}, status=403)
             
-            chat.delete()
-            return Response({"status": "Chat byl úspěšně smazán."})
+        chat.delete()
+        return Response({"status": "Chat byl úspěšně smazán."})
 
 
 class UserNotificationsView(generics.ListAPIView):
