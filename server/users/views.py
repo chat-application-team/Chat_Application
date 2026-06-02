@@ -684,4 +684,4 @@ class AdminAuditLogViewSet(viewsets.ReadOnlyModelViewSet):
 
     filterset_fields = ["action_type"]
 
-    search_fields = ["action", "admin__username"]
+    search_fields = ["action", "user__username"]

@@ -283,7 +283,7 @@ class Report(models.Model):
 
         constraints = [
             models.CheckConstraint(
-                check=~Q(reporter=F('target')),
+                condition=~Q(reporter=F('target')),
                 name='prevent_self_report'
             )
         ]

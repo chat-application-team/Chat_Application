@@ -48,7 +48,7 @@ class CustomUser(AbstractUser):
             models.Index(fields=['username']),
             models.Index(fields=['email']),
             models.Index(fields=['role']),
-            models.Index(fields=['last_seen']),
+            models.Index(fields=['last_login']),
         ]
 
     def __str__(self):
@@ -159,7 +159,7 @@ class Relationship(models.Model):
 
         constraints = [
             models.CheckConstraint(
-                check=~Q(sender=F('user_b')),
+                condition=~Q(user_a=F('user_b')),
                 name='prevent_self_relationship'
             )
         ]
@@ -171,38 +171,13 @@ class Relationship(models.Model):
 
     def clean(self):
 
-        if self.sender == self.receiver:
+        if self.user_a == self.user_b:
             raise ValidationError(
                 'User cannot create relationship with themselves.'
             )
 
     def __str__(self):
-        return f'{self.sender} -> {self.receiver} ({self.type})'
-
-class AuditLog(models.Model):
-
-    admin = models.ForeignKey(
-        CustomUser,
-        on_delete=models.CASCADE,
-        related_name='admin_logs'
-    )
-
-    action = models.TextField()
-
-    created_at = models.DateTimeField(
-        auto_now_add=True
-    )
-
-    class Meta:
-
-        ordering = ['-created_at']
-
-        indexes = [
-            models.Index(fields=['created_at']),
-        ]
-
-    def __str__(self):
-        return self.action
+        return f'{self.user_a} -> {self.user_b} ({self.type})'
 
 class AuditLog(models.Model):
 
@@ -233,10 +208,16 @@ class AuditLog(models.Model):
 
     action = models.TextField()
 
-    created_at = models.DateTimeField(auto_now_add=True)
+    created_at = models.DateTimeField(
+        auto_now_add=True
+    )
 
     class Meta:
         ordering = ['-created_at']
+
+        indexes = [
+            models.Index(fields=['created_at']),
+        ]
 
     def __str__(self):
         return self.action
