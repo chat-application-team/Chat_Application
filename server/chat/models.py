@@ -275,6 +275,11 @@ class Report(models.Model):
 
     reason = models.TextField()
 
+    is_resolved = models.BooleanField(
+        default=False,
+        db_index=True
+    )
+
     created_at = models.DateTimeField(
         auto_now_add=True
     )

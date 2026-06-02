@@ -1,13 +1,24 @@
-from rest_framework import generics
+from rest_framework import generics, viewsets, mixins, status
+from rest_framework.decorators import action
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.exceptions import PermissionDenied
 from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
-from .models import Chat, ChatMember, Message, Notification
-from .serializers import ChatSerializer, MessageSerializer, NotificationSerializer
-
+from .models import Chat, ChatMember, Message, Notification, Report
+from .serializers import (
+    ChatSerializer,
+    MessageSerializer,
+    NotificationSerializer,
+    AdminChatSerializer,
+    AdminMessageSerializer,
+    UserSubmitReportSerializer,
+    AdminReportSerializer
+)
+from users.views import IsAdminUserRole
+from users.models import AuditLog
+from django.db.models import Count, Q
 
 class UserChatsView(generics.ListAPIView):
     serializer_class = ChatSerializer
@@ -79,3 +90,102 @@ class UserNotificationsView(generics.ListAPIView):
 
     def get_queryset(self):
         return Notification.objects.filter(user=self.request.user, is_read=False)
+    
+class ReportViewSet(
+    mixins.CreateModelMixin,
+    mixins.ListModelMixin,
+    mixins.RetrieveModelMixin,
+    viewsets.GenericViewSet
+):
+    queryset = Report.objects.all().select_related("reporter", "target")
+
+    def get_permissions(self):
+        if self.action == "create":
+            return [IsAuthenticated()]
+        return [IsAdminUserRole()]
+    
+    def get_serializer_class(self):
+        if self.action == "create":
+            return UserSubmitReportSerializer
+        return AdminReportSerializer
+    
+    def perform_create(self, serializer):
+        serializer.save(reporter=self.request.user)
+
+    @action(detail=True, methods=["post"], url_path="resolve")
+    def resolve(self, request, pk=None):
+        report = self.get_object()
+        report.is_resolved = True
+        report.save()
+
+        return Response(
+            {"detail":"Report marked as resolved."},
+            status=status.HTTP_200_OK
+        )
+
+class AdminGroupChatManagementViewSet(
+    mixins.ListModelMixin,
+    mixins.RetrieveModelMixin,
+    mixins.DestroyModelMixin,
+    viewsets.GenericViewSet
+):
+    permission_classes = [IsAdminUserRole]
+    serializer_class = AdminChatSerializer
+
+    filterset_fields = ["created_at"]
+    search_fields = ["name", "description"]
+
+    def get_queryset(self):
+        return Chat.objects.filter(
+            type=Chat.GROUP
+        ).annotate(members_count=Count("members", distinct=True)
+        ).prefetch_related("members__user")
+
+    def perform_destroy(self, instance):
+        chat_name = instance.name
+        chat_id = instance.id
+
+        super().perform_destroy(instance)
+
+        AuditLog.objects.create(
+            user=self.request.user,
+            action_type=AuditLog.ADMIN_DELETE_CHAT,
+            action=f"Admin {self.request.user.username} deleted Group chat '{chat_name}' (ID: {chat_id})."
+        )
+
+class AdminMessageManagementViewSet(
+    mixins.ListModelMixin,
+    mixins.RetrieveModelMixin,
+    mixins.DestroyModelMixin,
+    viewsets.GenericViewSet
+):
+    permission_classes = [IsAdminUserRole]
+    serializer_class = AdminMessageSerializer
+
+    def get_queryset(self):
+        reported_user_ids = Report.objects.filter(
+            is_resolved=False
+        ).values_list("target_id", flat=True)
+
+        return Message.objects.filter(
+            Q(chat__type=Chat.GROUP) |
+            Q(sender_id__in=reported_user_ids)
+        ).select_related("sender", "chat").prefetch_related("attachments")
+
+
+    filterset_fields = ["chat", "sender", "type", "is_read"]
+    search_fields = ["content"]
+
+    def perform_destroy(self, instance):
+        message_id = instance.id
+        sender_username = instance.sender.username if instance.sender else "Deleted User"
+        chat_id = instance.chat.id
+        content_snippet = instance.content[:30]
+
+        super().perform_destroy(instance)
+    
+        AuditLog.objects.create(
+            user=self.request.user,
+            action_type=AuditLog.ADMIN_DELETE_MESSAGE,
+            action=f"Admin {self.request.user.username} deleted message ID {message_id} ('{content_snippet}...') sent by {sender_username} in Chat ID {chat_id}."
+        )

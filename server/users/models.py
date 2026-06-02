@@ -203,6 +203,8 @@ class AuditLog(models.Model):
     ADMIN_CREATE_USER = "admin_create_user"
     ADMIN_UPDATE_USER = "admin_update_user"
     ADMIN_DELETE_USER = "admin_delete_user"
+    ADMIN_DELETE_CHAT = "admin_delete_chat"
+    ADMIN_DELETE_MESSAGE = "admin_delete_message"
 
     action_type = models.CharField(max_length=50)
 
