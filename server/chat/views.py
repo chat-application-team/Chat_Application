@@ -211,6 +211,47 @@ class LeaveGroupView(APIView):
         member.delete()
 
         return Response({"status": "Úspěšně jsi opustil skupinu."})
+    
+
+class RemoveGroupMemberView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, chat_id):
+        try:
+            chat = Chat.objects.get(id=chat_id)
+        
+        except Chat.DoesNotExist:
+            return Response({"error": "Chat neexistuje."}, status=404)
+        
+        if chat.type != 'group':
+            return Response({"error": "Tato akce je povolena pouze pro skupinové chaty."}, status=400)
+        
+        try:
+            current_member = ChatMember.objects.get(chat=chat, user=request.user)
+            if current_member.role not in ['owner', 'admin']:
+                return Response({"error": "Nemáš práva odstraňovat členy. Musíš být vlastníkem nebo administrátorem skupiny."}, status=403)
+
+        except ChatMember.DoesNotExist:
+            return Response({"error": "Nejsi členem tohoto chatu."}, status=403)
+
+        user_to_remove_id = request.data.get("user_id")
+        if not user_to_remove_id:
+            return Response({"error": "Musíš zadat 'user_id' uživatele, kterého chceš odstranit."}, status=400)
+
+        try:
+            member_to_remove = ChatMember.objects.get(chat=chat, user_id=user_to_remove_id)
+        
+        except ChatMember.DoesNotExist:
+            return Response({"error": "Uživatel, kterého chceš odstranit, není členem tohoto chatu."}, status=404)
+
+        if member_to_remove.role == 'owner':
+            return Response({"error": "Vlastníka nelze odstranit."}, status=403)
+        
+        if current_member.role == 'admin' and member_to_remove.role == 'admin':
+            return Response({"error": "Administrátor nemůže odstranit jiného administrátora."}, status=403)
+        
+        member_to_remove.delete()
+        return Response({"status": f"Uživatel {member_to_remove.user.username} byl úspěšně odstraněn z chatu."})
         
     
 class DeleteChatView(APIView):
@@ -242,3 +283,18 @@ class UserNotificationsView(generics.ListAPIView):
 
     def get_queryset(self):
         return Notification.objects.filter(user=self.request.user, is_read=False)
+    
+
+class MarkNotificationReadView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, notification_id):
+        try:
+            notification = Notification.objectsl.get(id=notification_id, user=request.user)
+            notification.is_read = True
+            notification.save()
+            return Response({"status": "Notifikace označena jako přečtená."})
+        
+        except Notification.DoesNotExist:
+            return Response({"error": "Notifikace neexistuje nebo nepatří tobě."}, status=404)
+        
