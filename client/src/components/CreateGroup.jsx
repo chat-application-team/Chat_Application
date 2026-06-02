@@ -1,102 +1,90 @@
 import { useState } from "react";
-import axiosClient from "../api/axiosClient";
+import { chatService } from "../api/chatService";
+import { userService } from "../api/userService";
 
 function CreateGroup({ onClose, onCreate }) {
     const [groupName, setGroupName] = useState('');
+    const [searchQuery, setSearchQuery] = useState('');
+    const [searchResults, setSearchResults] = useState([]);
     const [selectedUsers, setSelectedUsers] = useState([]);
 
-    const mockFriends = [
-        { id: 101, username: 'Petr Novotný' },
-        { id: 102, username: 'Pavel (Frontend)' },
-        { id: 103, username: 'Školní Admin' },
-        { id: 104, username: 'Jana Dvořáková' }
-    ];
+    const handleSearch = async (e) => {
+      const query = e.target.value;
+      setSearchQuery(query);
+      const results = await userService.searchUsers(query);
+      // Vyfiltrujeme lidi, co už jsou vybraní
+      setSearchResults(results.filter(u => !selectedUsers.find(su => su.id === u.id)));
+    };
 
-    const handleToggleUser = (userId) => {
-        setSelectedUsers(prev => 
-            prev.includes(userId) ? prev.filter(id => id !== userId) : [...prev, userId]
-        );
+    const handleAddUser = (user) => {
+      setSelectedUsers([...selectedUsers, user]);
+      setSearchQuery('');
+      setSearchResults([]);
+    };
+
+    const handleRemoveUser = (id) => {
+      setSelectedUsers(selectedUsers.filter(u => u.id !== id));
     };
 
     const handleSubmit = async (e) => {
-        e.preventDefault();
-        if (!groupName.trim() || selectedUsers.length === 0) return;
+      e.preventDefault();
+      if (!groupName.trim() || selectedUsers.length === 0) return;
 
-        //temp
-        console.log('Vytvářím skupinu:', groupName, 's uživateli:', selectedUsers);
-
-        const newGroup = {
-            id: Date.now(),
-            name: `Group --> ${groupName}`,
-            is_group: true,
-            unread_count: 0
-        };
-
+      // Získáme jen ID vybraných uživatelů
+      const memberIds = selectedUsers.map(u => u.id);
+      
+      // Volání backendu
+      const newGroup = await chatService.createGroup(groupName, memberIds);
+      
+      if (newGroup) {
         onCreate(newGroup);
         onClose();
-        /*
-        try {
-            const  response = await axiosClient.post('/chats/groups/', {
-                name: groupName,
-                members: selectedUsers
-            });
-            onCreate(response.data);
-            onClose();
-        } catch (error) {
-            console.error('Nelze vytvořit skupinu:', error);
-        }*/
+      } else {
+        alert('Vytvoření skupiny se nezdařilo.');
+      }
     };
 
     return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
-      <div className="bg-white rounded-lg w-full max-w-md p-6 shadow-xl relative">
-        <button onClick={onClose} className="absolute top-4 right-4 text-gray-500 hover:text-gray-800 text-xl font-bold">
-          &times;
-        </button>
-
-        <h2 className="text-2xl font-bold mb-6 text-gray-800">Nová skupina</h2>
-
+      <div className="bg-white p-6 rounded-lg shadow-xl w-96 relative">
+        <button onClick={onClose} className="absolute top-3 right-4 text-gray-500 hover:text-gray-800 text-xl font-bold">&times;</button>
+        <h2 className="text-xl font-bold mb-4 text-gray-800">Vytvořit novou skupinu</h2>
+        
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Název skupiny</label>
+          <input 
+            type="text" placeholder="Název skupiny" value={groupName} onChange={(e) => setGroupName(e.target.value)} required
+            className="w-full p-2 border rounded focus:ring-2 focus:ring-blue-500 outline-none" 
+          />
+          
+          <div className="border-t pt-3 border-gray-200">
+            <label className="block text-sm font-semibold text-gray-600 mb-1">Přidat členy</label>
             <input 
-              type="text" 
-              value={groupName}
-              onChange={(e) => setGroupName(e.target.value)}
-              placeholder="Např. Školní projekt..."
-              className="w-full p-2 border border-gray-300 rounded focus:outline-none focus:border-blue-500"
-              required
+              type="text" placeholder="Hledat uživatele..." value={searchQuery} onChange={handleSearch}
+              className="w-full p-2 border rounded bg-gray-50 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500" 
             />
+            {searchResults.length > 0 && (
+              <div className="mt-1 max-h-32 overflow-y-auto border border-gray-200 rounded shadow-sm bg-white">
+                {searchResults.map(user => (
+                  <div key={user.id} onClick={() => handleAddUser(user)} className="p-2 hover:bg-blue-50 cursor-pointer text-sm border-b last:border-b-0">
+                    {user.username}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Vyberte členy</label>
-            <div className="max-h-40 overflow-y-auto border border-gray-200 rounded p-2 space-y-2 bg-gray-50">
-              {mockFriends.map(friend => (
-                <label key={friend.id} className="flex items-center space-x-3 cursor-pointer p-1 hover:bg-gray-100 rounded">
-                  <input 
-                    type="checkbox" 
-                    checked={selectedUsers.includes(friend.id)}
-                    onChange={() => handleToggleUser(friend.id)}
-                    className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
-                  />
-                  <span className="text-gray-800">{friend.username}</span>
-                </label>
-              ))}
-            </div>
-            {selectedUsers.length === 0 && <p className="text-xs text-red-500 mt-1">Vyberte alespoň jednoho člena.</p>}
+          <div className="flex flex-wrap gap-2 mt-2 max-h-24 overflow-y-auto">
+            {selectedUsers.map(user => (
+              <span key={user.id} className="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full flex items-center font-semibold">
+                {user.username}
+                <button type="button" onClick={() => handleRemoveUser(user.id)} className="ml-1 text-blue-500 hover:text-red-500 font-bold">&times;</button>
+              </span>
+            ))}
           </div>
 
-          <div className="pt-4 flex justify-end space-x-3">
-            <button type="button" onClick={onClose} className="px-4 py-2 text-gray-600 bg-gray-100 rounded hover:bg-gray-200 transition">Zrušit</button>
-            <button 
-              type="submit" 
-              disabled={!groupName.trim() || selectedUsers.length === 0}
-              className="px-4 py-2 bg-blue-500 text-white font-bold rounded hover:bg-blue-600 transition disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              Vytvořit
-            </button>
-          </div>
+          <button type="submit" disabled={!groupName.trim() || selectedUsers.length === 0} className="w-full mt-4 bg-blue-500 text-white p-2 rounded hover:bg-blue-600 font-bold disabled:bg-gray-300 disabled:cursor-not-allowed transition">
+            Vytvořit skupinu
+          </button>
         </form>
       </div>
     </div>

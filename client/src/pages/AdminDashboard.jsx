@@ -1,91 +1,73 @@
 import { useState, useEffect } from 'react';
-//import axiosClient from '../api/axiosClient';
+import { adminService } from '../api/adminService';
 
-function AdminDashboard({ onBack, sendWebSocketMessage }) {
+function AdminDashboard() {
     const [activeTab, setActiveTab] = useState('users');
 
     const [users, setUsers] = useState([]);
     const [groups, setGroups] = useState([]);
-    const [stats, setStats] = useState({ totalUsers: 0, totalGroups: 0, bannedUsers: 0 });
+    const [stats, setStats] = useState({ totalUsers: 0, activeGroups: 0, bannedUsers: 0 });
+    const [loading, setLoading] = useState(true);
 
-    //temp
-    useEffect(() => {
-        setUsers([
-            { id: 1, username: 'admin_user', role: 'admin', status: 'online' },
-            { id: 2, username: 'KarelGamer', role: 'user', status: 'offline' },
-            { id: 3, username: 'Spammer123', role: 'user', status: 'banned' },
-        ]);
-        setGroups([
-            { id: 101, name: 'Projektování', members: 4, createdAt: '2026-05-10' },
-            { id: 102, name: 'Hráči D&D', members: 6, createdAt: '2026-05-12' },
-        ]);
-        setStats({ totalUsers: 3, activeGroups: 2, bannedUsers: 1 });
-    }, []);
-
-    /*backend
     useEffect(() => {
         const loadAdminData = async () => {
             try {
+                const fetchedStats = await adminService.getSystemStats();
                 const fetchedUsers = await adminService.getAllUsers();
                 const fetchedGroups = await adminService.getAllGroups();
-                const fetchedStats = await adminService.getSystemStats();
                 
+                setStats({
+                    totalUsers: fetchedStats?.total_users || fetchedUsers.length,
+                    activeGroups: fetchedStats?.total_groups || fetchedGroups.length,
+                    bannedUsers: fetchedUsers.filter(u => u.status === 'banned' || u.is_active === false).length
+                });
                 setUsers(fetchedUsers);
                 setGroups(fetchedGroups);
-                setStats(fetchedStats);
             } catch (error) {
                 console.error("Chyba při načítání dat pro administraci:", error);
+            } finally {
+                setLoading(false);
             }
         };
         loadAdminData();
-    }, []);*/
+    }, []);
 
-    // Funkce pro banování/odbanování uživatele
     const handleBanUser = async (id) => {
-        const user = users.find(u => u.id === id);
-        const newStatus = user.status === 'banned' ? 'offline' : 'banned';
-
-        setUsers(users.map(u => u.id === id ? { ...u, status: newStatus } : u));
-        setStats(prev => ({ 
-            ...prev, 
-            bannedUsers: newStatus === 'banned' ? prev.bannedUsers + 1 : prev.bannedUsers - 1 
-        }));
-            
-        // Pokud ho banujeme, pošleme serveru signál, ať ho okamžitě odpojí
-        if (newStatus === 'banned' && sendWebSocketMessage) {
-            sendWebSocketMessage({
-                type: 'SYSTEM_ACTION',
-                action: 'FORCE_LOGOUT',
-                targetUserId: id,
-                reason: 'Porušení pravidel serveru.'
-            });
-        }
-            
-            /*backend
-        try {
-            if (newStatus === 'banned') {
+        if(window.confirm("Opravdu chcete zabanovat tohoto uživatele?")) {
+            try {
                 await adminService.banUser(id);
-            } else {
-                await adminService.unbanUser(id);
-            }
-        } catch (error) {
-            console.error("Chyba při změně banu:", error);
-        }*/
-    };
-
-    // Smazání skupiny administrátorem
-    const handleDeleteGroup = async (id) => {
-        //temp
-        setGroups(groups.filter(g => g.id !== id));
-        setStats(prev => ({ ...prev, activeGroups: prev.activeGroups - 1 }));
-
-        /*backend
-        try {
-            await adminService.deleteGroup(id);
+            
+                setUsers(users.map(u => u.id === id ? { ...u, status: 'banned', is_active: false } : u));
+                setStats(prev => ({ ...prev, bannedUsers: prev.bannedUsers + 1 }));
+            
+                if (sendWebSocketMessage) {
+                    sendWebSocketMessage({
+                        type: 'SYSTEM_ACTION',
+                        action: 'FORCE_LOGOUT',
+                        targetUserId: id,
+                        reason: 'Porušení pravidel serveru.'
+                    });
+                }
             } catch (error) {
-            console.error("Chyba při mazání skupiny:", error);
-        }*/
+                alert("Nepodařilo se zabanovat uživatele. Zkontrolujte připojení k serveru.");
+            }
+        }
     };
+
+    const handleDeleteGroup = async (id) => {
+        if(window.confirm("Opravdu chcete nenávratně smazat tuto skupinu?")) {
+            try {
+                await adminService.deleteGroup(id);
+                
+                setGroups(groups.filter(g => g.id !== id));
+                setStats(prev => ({ ...prev, activeGroups: prev.activeGroups - 1 }));
+            } catch (error) {
+                alert("Nepodařilo se smazat skupinu.");
+            }
+        }
+    };
+
+    if (loading) return <div className="flex h-screen items-center justify-center bg-gray-100 text-xl font-bold text-gray-500">Načítám systémová data...</div>;
 
     return (
     <div className="flex h-screen bg-gray-100 font-sans">
@@ -94,37 +76,14 @@ function AdminDashboard({ onBack, sendWebSocketMessage }) {
       <div className="w-64 bg-slate-800 text-white flex flex-col">
         <div className="p-4 border-b border-slate-700">
           <h2 className="text-xl font-bold text-blue-400">Admin Panel</h2>
-          <p className="text-xs text-slate-400">Správa systému</p>
         </div>
-
         <div className="flex-1 p-4 space-y-2">
-          <button 
-            onClick={() => setActiveTab('stats')}
-            className={`w-full text-left p-2 rounded transition ${activeTab === 'stats' ? 'bg-blue-600' : 'hover:bg-slate-700'}`}
-          >
-            📊 Statistiky
-          </button>
-          <button 
-            onClick={() => setActiveTab('users')}
-            className={`w-full text-left p-2 rounded transition ${activeTab === 'users' ? 'bg-blue-600' : 'hover:bg-slate-700'}`}
-          >
-            👥 Uživatelé
-          </button>
-          <button 
-            onClick={() => setActiveTab('groups')}
-            className={`w-full text-left p-2 rounded transition ${activeTab === 'groups' ? 'bg-blue-600' : 'hover:bg-slate-700'}`}
-          >
-            💬 Skupiny
-          </button>
+          <button onClick={() => setActiveTab('stats')} className={`w-full text-left p-2 rounded transition ${activeTab === 'stats' ? 'bg-blue-600' : 'hover:bg-slate-700'}`}>📊 Statistiky</button>
+          <button onClick={() => setActiveTab('users')} className={`w-full text-left p-2 rounded transition ${activeTab === 'users' ? 'bg-blue-600' : 'hover:bg-slate-700'}`}>👥 Uživatelé</button>
+          <button onClick={() => setActiveTab('groups')} className={`w-full text-left p-2 rounded transition ${activeTab === 'groups' ? 'bg-blue-600' : 'hover:bg-slate-700'}`}>💬 Skupiny</button>
         </div>
-
         <div className="p-4 border-t border-slate-700">
-          <button 
-            onClick={onBack}
-            className="w-full bg-slate-700 hover:bg-slate-600 text-white p-2 rounded transition flex items-center justify-center font-bold"
-          >
-            ← Zpět do chatu
-          </button>
+          <button onClick={onBack} className="w-full bg-slate-700 hover:bg-slate-600 text-white p-2 rounded font-bold transition">← Zpět do chatu</button>
         </div>
       </div>
 
@@ -160,34 +119,27 @@ function AdminDashboard({ onBack, sendWebSocketMessage }) {
               <table className="min-w-full text-left border-collapse">
                 <thead>
                   <tr className="bg-gray-100 border-b border-gray-200 text-gray-600 text-sm uppercase">
-                    <th className="p-4 font-semibold">ID</th>
                     <th className="p-4 font-semibold">Uživatel</th>
                     <th className="p-4 font-semibold">Role</th>
-                    <th className="p-4 font-semibold">Status</th>
                     <th className="p-4 font-semibold text-right">Akce</th>
                   </tr>
                 </thead>
                 <tbody>
                   {users.map(u => (
                     <tr key={u.id} className="border-b border-gray-100 hover:bg-gray-50">
-                      <td className="p-4 text-gray-500">{u.id}</td>
                       <td className="p-4 font-medium text-gray-800">{u.username}</td>
                       <td className="p-4">
-                        <span className={`px-2 py-1 text-xs rounded-full font-bold ${u.role === 'admin' ? 'bg-purple-100 text-purple-700' : 'bg-gray-200 text-gray-700'}`}>
-                          {u.role}
+                        <span className={`px-2 py-1 text-xs rounded-full font-bold ${u.is_superuser ? 'bg-purple-100 text-purple-700' : 'bg-gray-200 text-gray-700'}`}>
+                          {u.is_superuser ? 'Admin' : 'Uživatel'}
                         </span>
                       </td>
-                      <td className="p-4">
-                        <span className={`px-2 py-1 text-xs rounded-full font-bold ${u.status === 'banned' ? 'bg-red-100 text-red-700' : u.status === 'online' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}`}>
-                          {u.status}
-                        </span>
-                      </td>
-                      <td className="p-4 text-right space-x-2">
-                        {u.role !== 'admin' && (
-                          <button onClick={() => handleBanUser(u.id)} className={`px-3 py-1 text-xs font-bold rounded text-white ${u.status === 'banned' ? 'bg-gray-500 hover:bg-gray-600' : 'bg-red-500 hover:bg-red-600'}`}>
-                            {u.status === 'banned' ? 'Odbanovat' : 'Zabanovat'}
-                          </button>
-                        )}
+                      <td className="p-4 text-right">
+                        {/* Zobrazíme tlačítko jen pokud není admin a ještě není zabanovaný */}
+                        {!u.is_superuser && u.status !== 'banned' && u.is_active !== false ? (
+                          <button onClick={() => handleBanUser(u.id)} className="px-3 py-1 text-xs font-bold rounded text-white bg-red-500 hover:bg-red-600 transition shadow-sm">Zabanovat</button>
+                        ) : !u.is_superuser ? (
+                          <span className="text-xs font-bold text-red-500">Zabanován</span>
+                        ) : null}
                       </td>
                     </tr>
                   ))}
@@ -205,22 +157,16 @@ function AdminDashboard({ onBack, sendWebSocketMessage }) {
               <table className="min-w-full text-left border-collapse">
                 <thead>
                   <tr className="bg-gray-100 border-b border-gray-200 text-gray-600 text-sm uppercase">
-                    <th className="p-4 font-semibold">ID</th>
                     <th className="p-4 font-semibold">Název</th>
-                    <th className="p-4 font-semibold">Členů</th>
                     <th className="p-4 font-semibold text-right">Akce</th>
                   </tr>
                 </thead>
                 <tbody>
                   {groups.map(g => (
                     <tr key={g.id} className="border-b border-gray-100 hover:bg-gray-50">
-                      <td className="p-4 text-gray-500">{g.id}</td>
                       <td className="p-4 font-medium text-gray-800">{g.name}</td>
-                      <td className="p-4 text-gray-600">{g.members}</td>
                       <td className="p-4 text-right">
-                        <button onClick={() => handleDeleteGroup(g.id)} className="px-3 py-1 text-xs font-bold rounded text-white bg-red-500 hover:bg-red-600">
-                          Smazat skupinu
-                        </button>
+                        <button onClick={() => handleDeleteGroup(g.id)} className="px-3 py-1 text-xs font-bold rounded text-white bg-red-500 hover:bg-red-600 transition shadow-sm">Smazat skupinu</button>
                       </td>
                     </tr>
                   ))}

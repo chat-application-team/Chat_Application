@@ -9,7 +9,7 @@ const ProtectedRoute = ({ children }) => {
 
   if (loading) return <div className="p-8 text-center">Načítání aplikace...</div>;
 
-  return isAuthenticated ? children : <Navigate to="/login" />;
+  return isAuthenticated ? children : <Navigate to="/auth/login" />;
 };
 
 function App() {
