@@ -275,7 +275,55 @@ class DeleteChatView(APIView):
             
         chat.delete()
         return Response({"status": "Chat byl úspěšně smazán."})
+    
 
+class ChangeMemberRoleView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, chat_id):
+        try:
+            chat = Chat.objects.get(id=chat_id)
+
+        except Chat.DoesNotExist:
+            return Response({"error": "Chat neexistuje."}, status=404)
+        
+        if chat.type != 'group':
+            return Response({"error": "V soikromém chatu nelze měnit role členů."}, status=400)
+        
+        try:
+            current_member = ChatMember.objects.get(chat=chat, user=request.user)
+            if current_member.role not in ['owner', 'admin']:
+                return Response({"error": "Nemáš práva měnit role členů. Musíš být vlastníkem nebo administrátorem skupiny."}, status=403)
+            
+        except ChatMember.DoesNotExist:
+            return Response({"error": "Nejsi členem tohoto chatu."}, status=403)
+        
+        target_user_id = request.data.get("user_id")
+        new_role = request.data.get("role")
+
+        if not target_user_id or not new_role:
+            return Response({"error": "Musíš zadat 'user_id' a 'role' pro změnu role člena."}, status=400)
+        
+        if new_role not in ['admin', 'member']:
+            return Response({"error": "Neplatná role. Role musí být 'admin' nebo 'member'."}, status=400)
+        
+        try:
+            member_to_change = ChatMember.objects.get(chat=chat, user_id=target_user_id)
+        
+        except ChatMember.DoesNotExist:
+            return Response({"error": "Uživatel, jehož roli chceš změnit, není členem tohoto chatu."}, status=404)
+        
+        if member_to_change.role == 'owner':
+            return Response({"error": "Roli vlastníka nelze měnit."}, status=403)
+        
+        if current_member.role == 'admin' and member_to_change.role == 'admin':
+            return Response({"error": "Správce nemůže měnit roli jiného správce."}, status=403)
+        
+        member_to_change.role = new_role
+        member_to_change.save()
+
+        return Response({"status": f"Role uživatele {member_to_change.user.username} byla úspěšně změněna na {new_role}."})
+        
 
 class UserNotificationsView(generics.ListAPIView):
     serializer_class = NotificationSerializer
