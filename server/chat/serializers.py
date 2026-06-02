@@ -3,9 +3,17 @@ from .models import Chat, ChatMember, Message, Attachment, Notification
 from users.models import CustomUser 
 
 class CustomUserSerializer(serializers.ModelSerializer):
+    avatar = serializers.SerializerMethodField()
+    status = serializers.CharField(source='profile.status', read_only=True)
+
     class Meta:
         model = CustomUser
-        fields = ['id', 'username'] 
+        fields = ['id', 'username', 'avatar', 'status'] 
+
+    def get_avatar(self, obj):
+        if hasattr(obj, 'profile') and obj.profile.avatar:
+            return obj.profile.avatar.url
+        return "/media/avatars/default.png"
 
 class AttachmentSerializer(serializers.ModelSerializer):
     class Meta:
