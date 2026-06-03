@@ -1,31 +1,61 @@
 import { useState } from 'react';
-import axiosClient from '../api/axiosClient';
+/*import axiosClient from '../api/axiosClient';*/
 import ChatAvatar from './ChatAvatar';
+import { chatService } from "../api/chatService";
+import { userService } from "../api/userService";
 
 function GroupInfo({ chat, onClose, onLeave }) {
     const [newMember, setNewMember] = useState('');
+    const [searchResults, setSearchResults] = useState([]);
+    const [selectedUser, setSelectedUser] = useState(null);
+
+    const handleSearch = async (e) => {
+      const query = e.target.value;
+      setNewMember(query);
+      setSelectedUser(null);
+
+      if (!query.trim()) {
+        setSearchResults([]);
+        return;
+      }
+
+      const results = await userService.searchUsers(query);
+      setSearchResults(results);
+    };
+
+    const handleSelectUser = (user) => {
+      setSelectedUser(user);
+      setNewMember(user.username);
+      setSearchResults([]);
+    };
 
     const handleAddMember = async (e) => {
       e.preventDefault();
-      if (!newMember.trim()) return;
 
-      try {
-        await axiosClient.post(`/api/chat/chats/${chat.id}/add-member/`, { username: newMember });
-        alert(`Uživatel ${newMember} byl přidán.`);
+      if (!selectedUser) {
+        alert("Nejdřív vyber uživatele ze seznamu.");
+        return;
+      }
+      const result = await chatService.addMemberToGroup(chat.id, selectedUser.id);
+
+      if (result.success) {
+        alert(`Uživatel ${selectedUser.username} byl přidán.`);
         setNewMember('');
-      } catch (error) {
-        console.error('Nelze přidat člena:', error);
+        setSelectedUser(null);
+        setSearchResults([]);
+      } else {
         alert('Chyba při přidávání člena.');
       }
     };
 
     const handleLeaveGroup = async () => {
       if(window.confirm("Opravdu chcete opustit tuto skupinu?")) {
-        try {
-          await axiosClient.delete(`/api/chat/chats/${chat.id}/add-member/`);
+        const result = await chatService.leaveGroup(chat.id);
+
+        if (result.success) {
           onLeave(chat.id);
-        } catch (error) {
-          console.error('Chyba při opouštění skupiny:', error);
+        } else {
+          alert("Chyba při opouštění skupiny.");
         }
       }
     };
@@ -76,7 +106,7 @@ function GroupInfo({ chat, onClose, onLeave }) {
             <input
               type="text"
               value={newMember}
-              onChange={(e) => setNewMember(e.target.value)}
+              onChange={handleSearch}
               placeholder="Zadejte jméno..."
               className="flex-1 rounded-2xl border border-violet-100 bg-violet-50/40 px-4 py-3 text-sm outline-none focus:border-violet-300 focus:ring-2 focus:ring-violet-100"
             />
@@ -88,6 +118,22 @@ function GroupInfo({ chat, onClose, onLeave }) {
               +
             </button>
           </div>
+
+          {searchResults.length > 0 && (
+            <div className="mt-2 max-h-36 overflow-y-auto rounded-3xl border border-violet-100 bg-white p-2 shadow-lg">
+              {searchResults.map((user) => (
+                <button
+                  type="button"
+                  key={user.id}
+                  onClick={() => handleSelectUser(user)}
+                  className="flex w-full items-center gap-3 rounded-2xl px-3 py-2 text-left transition hover:bg-violet-50">
+                  
+                  <ChatAvatar username={user.username} size="sm" />
+                  <span className="truncate text-sm font-semibold text-violet-900"> {user.username}</span>
+                </button>
+              ))}
+            </div>
+          )}
 
           <div className="border-t border-violet-100 mt-6 pt-6">
             <button

@@ -24,13 +24,24 @@ export const userService = {
     },
 
     updateProfile: async (data) => {
-        try {
-            // Úprava vlastního profilu 
-            const response = await axiosClient.patch('/api/users/me/update/', data);
-            return { success: true, data: response.data };
-        } catch (error) {
-            return { success: false, message: error.response?.data?.detail || 'Chyba při ukládání' };
+    try {
+        const response = await axiosClient.patch(
+        "/api/users/me/update/",
+        data,
+        {
+            headers: {
+            "Content-Type": "multipart/form-data",
+            },
         }
+        );
+
+        return { success: true, data: response.data };
+    } catch (error) {
+        return {
+        success: false,
+        message: error.response?.data?.detail || "Chyba při ukládání",
+        };
+    }
     },
 
     //Změna hesla
@@ -64,7 +75,24 @@ export const userService = {
         } catch (error) {
             return null;
         }
-    }
+    },
+
+    updateStatus: async (status) => {
+        try {
+            const response = await axiosClient.patch('/api/users/me/update/', {
+            profile: {
+                status
+            }
+            });
+
+            return { success: true, data: response.data };
+        } catch (error) {
+            return {
+            success: false,
+            message: error.response?.data?.detail || 'Nelze změnit status'
+            };
+        }
+    },
 };
 
 export default userService;

@@ -18,9 +18,11 @@ import MessageInput from "../components/MessageInput";
 import SearchUserItem from "../components/SearchUserItem";
 
 function ChatDashboard() {
-  const { user, logout } = useAuth();
+  const { user, setUser, logout } = useAuth();
   const [currentMessage, setCurrentMessage] = useState("");
   const [showAdmin, setShowAdmin] = useState(false);
+
+  const messagesEndRef = useRef(null);
 
   const [conversations, setConversations] = useState([]);
   const [activeChat, setActiveChat] = useState(null);
@@ -47,11 +49,26 @@ function ChatDashboard() {
     friendRequests: 0,
   });
 
-    const handleNewMessage = (msg) => {
-        if (activeChat && msg.chat_id === activeChat.id) {
-            setMessages(prev => [...prev, msg]);
-        }
-        // Zde by mohla být logika pro ztučnění nepřečteného chatu v levém panelu
+  const normalizePrivateChat = (chat, foundUser) => ({
+    ...chat,
+    name: foundUser.username,
+    avatar: foundUser.profile?.avatar,
+    status: foundUser.status || foundUser.profile?.status || "offline",
+    other_user_id: foundUser.id,
+    is_group: false,
+  });
+
+    const handleNewMessage = (data) => {
+      const msg = data.message || data;
+
+      const messageChatId =
+        msg.chat_id ||
+        msg.chat ||
+        activeChat?.id;
+
+      if (activeChat && Number(messageChatId) === Number(activeChat.id)) {
+        setMessages(prev => [...prev, msg]);
+      }
     };
 
     const handleNewFriendRequest = (req) => {
@@ -66,7 +83,7 @@ function ChatDashboard() {
         }
     };
 
-    const { sendMessage } = useWebSocket(user, handleNewMessage, handleNewFriendRequest, handleSystemAction);
+    const { sendMessage } = useWebSocket(user, activeChat?.id, handleNewMessage);
 
     //načítání po přihlášení
     useEffect(() => {
@@ -76,8 +93,10 @@ function ChatDashboard() {
                 setConversations(chatData || []);
                 
                 const initialRequests = await socialService.getPendingRequests();
-                setFriendRequests(initialRequests || []);
-                setNotifications({ friendRequests: initialRequests?.length || 0 });
+                const receivedRequests = initialRequests?.recieved || [];
+
+                setFriendRequests(receivedRequests);
+                setNotifications({ friendRequests: receivedRequests.length });
             } catch (error) {
                 console.error("Chyba při inicializaci Dashboardu:", error);
             }
@@ -85,12 +104,55 @@ function ChatDashboard() {
         fetchData();
     }, []);
 
+    useEffect(() => {
+      if (!user?.id) return;
+
+      const setOnline = async () => {
+        const result = await userService.updateStatus("online");
+
+        if (result.success) {
+          setUser(prev => ({
+            ...prev,
+            profile: {
+              ...prev.profile,
+              status: "online",
+            },
+          }));
+        }
+      };
+
+      setOnline();
+
+      const interval = setInterval(() => {
+        userService.pingStatus();
+      }, 120000);
+
+      return () => clearInterval(interval);
+    }, [user?.id]);
+
+    //pro aut. scroll při přetýkání zpráv
+    useEffect(() => {
+      messagesEndRef.current?.scrollIntoView({
+        behavior: 'smooth'
+      });
+    }, [messages]);
+
   //Funkce, která se spustí při každém napsaném písmenku do vyhledávání
     const handleSearch = async (e) => {
         const query = e.target.value;
         setSearchQuery(query);
         const results = await userService.searchUsers(query);
         setSearchResults(results);
+
+        const friends = await socialService.getFriends();
+        const friendIds = new Set(friends.map(f => f.id));
+
+        setSearchResults(
+          results.map(u => ({
+            ...u,
+            isFriend: friendIds.has(u.id),
+          }))
+        );
     };
 
     //Funkce pro odeslání žádosti z vyhledávání
@@ -109,12 +171,20 @@ function ChatDashboard() {
     };
 
     const handleStartNewChat = async (foundUser) => {
-      const newChat = await chatService.createConversation(foundUser.id, foundUser.username);
+      const newChat = await chatService.createConversation(foundUser.id);
+
       if (newChat) {
-        setConversations(prev => [newChat, ...prev]); //Vytvoření nového chatu na začátek koverzací
-        setActiveChat(newChat); //Hned se nastaví jako aktivní
+        const privateChat = normalizePrivateChat(newChat, foundUser);
+
+        setConversations((prev) => [
+          privateChat,
+          ...prev,
+        ]);
+
+        setActiveChat(privateChat);
         setMessages([]);
-        setSearchQuery('');
+        setSearchQuery("");
+        setSearchResults([]);
       }
     };
 
@@ -131,11 +201,28 @@ function ChatDashboard() {
         if (!currentMessage.trim() && !selectedImage) return;
 
         try {
-            await chatService.sendMessage(activeChat.id, currentMessage, selectedImage);
-            
-            setCurrentMessage('');
-            setSelectedImage(null);
-            setShowEmojiPicker(false);
+            const result = await chatService.sendMessage(activeChat.id, currentMessage);
+
+            if (result.success) {
+              setMessages(prev => [
+                ...prev,
+                {
+                  id: result.data?.message_id || Date.now(),
+                  chat: activeChat.id,
+                  sender_id: user.id,
+                  sender: user,
+                  content: currentMessage,
+                  type: "text",
+                  created_at: new Date().toISOString(),
+                }
+              ]);
+
+              setCurrentMessage('');
+              setSelectedImage(null);
+              setShowEmojiPicker(false);
+            } else {
+              alert('Zprávu se nepodařilo odeslat.');
+            }
         } catch (error) {
             console.error('Chyba při odesílání zprávy:', error);
             alert('Zprávu se nepodařilo odeslat.');
@@ -151,6 +238,7 @@ function ChatDashboard() {
       {/* --- HORNÍ PANEL --- */}
       <AppHeader
         user={user}
+        setUser={setUser}
         logout={logout}
         setShowAdmin={setShowAdmin}
         setIsFriendsOpen={setIsFriendsOpen}
@@ -230,16 +318,24 @@ function ChatDashboard() {
                     Zatím tu nejsou žádné zprávy. Napište jako první!
                   </div>
                 ) : (
-                  messages.map((msg, index) => {
-                    //+ temp setup i pro mock
-                    const isMine =
-                      msg.isMine === true ||
-                      (user?.id != null && msg.sender_id === user.id);
+                  <>
+                    {messages.map((msg, index) => {
+                      const isMine =
+                        msg.isMine === true ||
+                        msg.sender_id === user?.id ||
+                        msg.sender?.id === user?.id;
 
-                    return (
-                      <MessageBubble key={index} msg={msg} isMine={isMine} />
-                    );
-                  })
+                      return (
+                        <MessageBubble
+                          key={index}
+                          msg={msg}
+                          isMine={isMine}
+                        />
+                      );
+                    })}
+
+                    <div ref={messagesEndRef} />
+                  </>
                 )}
               </div>
 

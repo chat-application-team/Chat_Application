@@ -29,14 +29,16 @@ export const socialService = {
     respondToRequest: async (userId, accept) => {
         try {
             if (accept) {
-                await axiosClient.patch('/api/users/relations/requests/', {
-                    user_id: userId
-                });
+            await axiosClient.patch('/api/users/relations/requests/', {
+                user_id: userId
+            });
             } else {
-                await axiosClient.delete(`/api/users/relations/delete/${userId}/`);
+            await axiosClient.delete(`/api/users/relations/delete/${userId}/`);
             }
+
             return { success: true };
         } catch (error) {
+            console.error("Friend request response failed:", error.response?.data || error);
             return { success: false };
         }
     },

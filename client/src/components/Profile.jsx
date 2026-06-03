@@ -11,6 +11,7 @@ function Profile({ onClose }) {
     const [bio, setBio] = useState(user?.bio || ''); // PŘIDÁNO
     const [password, setPassword] = useState('');
     const [statusMsg, setStatusMsg] = useState({ text: '', type: '' });
+    const [oldPassword, setOldPassword] = useState('');
 
 
     const handleSave = async (e) => {
@@ -19,20 +20,33 @@ function Profile({ onClose }) {
 
         try {
             const updateRes = await userService.updateProfile({ username, email, bio });
-            setUser(updateRes); 
+            if (!updateRes.success) {
+              throw new Error(updateRes.message);
+            }
 
-            if (password.trim() !== '') {
-                await userService.changePassword({ new_password: password });
-                setPassword('');
+            setUser(updateRes.data);
+
+            if (password.trim() !== '' || oldPassword.trim() !== '') {
+              if (!oldPassword.trim() || !password.trim()) {
+                throw new Error("Pro změnu hesla vyplňte staré i nové heslo.");
+              }
+              const passwordRes = await userService.changePassword(oldPassword, password);
+              if (!passwordRes.success) {
+                throw new Error(passwordRes.message);
+              }
+              setOldPassword('');
+              setPassword('');
             }
 
             setStatusMsg({ text: 'Profil byl úspěšně aktualizován!', type: 'success' });
             setTimeout(() => setStatusMsg({ text: '', type: '' }), 3000);
         } catch (error) {
             console.error('Chyba aktualizace:', error);
-            setStatusMsg({ text: 'Při ukládání došlo k chybě.', type: 'error' });
+            setStatusMsg({ text: error.message || 'Při ukládání došlo k chybě.', type: 'error' });
         }
     };
+
+  const previewName = username.trim() || user?.username || "Uživatel";
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 px-4">
@@ -84,6 +98,11 @@ function Profile({ onClose }) {
           <div>
             <label className="mb-1 block text-sm font-semibold text-violet-900">O mně</label>
             <textarea value={bio} onChange={(e) => setBio(e.target.value)} placeholder="Napište něco o sobě..." className="h-20 w-full resize-none rounded-2xl border border-violet-100 bg-violet-50/40 px-4 py-3 text-sm text-violet-900 outline-none transition placeholder:text-violet-300 focus:border-violet-300 focus:bg-white focus:ring-2 focus:ring-violet-100" />
+          </div>
+
+          <div className="border-t border-violet-100 pt-4">
+            <label className="mb-1 block text-sm font-semibold text-violet-900"> Staré heslo</label>
+            <input type="password" placeholder="Vyplň jen při změně hesla" value={oldPassword} onChange={(e) => setOldPassword(e.target.value)} className="w-full rounded-2xl border border-violet-100 bg-violet-50/40 px-4 py-3 text-sm text-violet-900 outline-none transition placeholder:text-violet-300 focus:border-violet-300 focus:bg-white focus:ring-2 focus:ring-violet-100"/>
           </div>
 
           <div className="border-t border-violet-100 pt-4">

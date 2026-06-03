@@ -35,9 +35,13 @@ function CreateGroup({ onClose, onCreate }) {
       const memberIds = selectedUsers.map(u => u.id);
       
       // Volání backendu
-      const newGroup = await chatService.createGroup(groupName, memberIds);
+      const newGroup = await chatService.createGroup(groupName);
       
       if (newGroup) {
+        for (const userId of memberIds) {
+          await chatService.addMemberToGroup(newGroup.id, userId);
+        }
+
         onCreate(newGroup);
         onClose();
       } else {
@@ -45,7 +49,7 @@ function CreateGroup({ onClose, onCreate }) {
       }
     };
 
-      const canCreate = groupName.trim() && selectedUsers.length > 0;
+      const canCreate = groupName.trim().length > 0 && selectedUsers.length > 0;
       const previewName = groupName.trim() || "Nová skupina";
 
   return (

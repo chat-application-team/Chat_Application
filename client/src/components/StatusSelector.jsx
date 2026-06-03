@@ -7,7 +7,6 @@ function StatusSelector({ status, onChange }) {
   // Available user statuses
   const options = [
     { value: "online", label: "Online" },
-    { value: "offline", label: "Offline" },
     { value: "dnd", label: "Nerušit" },
   ];
 

@@ -2,9 +2,12 @@ import { useState } from "react";
 import ChatAvatar from "./ChatAvatar";
 import UserStatus from "./UserStatus";
 import StatusSelector from "./StatusSelector";
+import { userService } from "../api/userService";
+
 
 function AppHeader({
   user,
+  setUser,
   logout,
   setShowAdmin,
   setIsFriendsOpen,
@@ -12,7 +15,24 @@ function AppHeader({
   friendRequests,
 }) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [userStatus, setUserStatus] = useState(user?.status || "offline");
+  const userStatus = user?.profile?.status || user?.status || "offline";
+
+  const handleStatusChange = async (newStatus) => {
+    const result = await userService.updateStatus(newStatus);
+
+    if (result.success) {
+
+      setUser(prev => ({
+        ...prev,
+        profile: {
+          ...prev.profile,
+          status: newStatus,
+        },
+      }));
+      } else {
+        alert(result.message || "Status se nepodařilo změnit.");
+      }
+  };
 
   return (
     <header className="h-20 bg-white border-b border-violet-100 px-8 flex items-center justify-between">
@@ -70,7 +90,7 @@ function AppHeader({
                 {/* Status selector */}
                 <StatusSelector
                   status={userStatus}
-                  onChange={setUserStatus}
+                  onChange={handleStatusChange}
                 />
               </div>
             </div>
@@ -104,16 +124,17 @@ function AppHeader({
                 )}
               </button>
 
-              <button
-                onClick={() => {
-                  setShowAdmin(true);
-                  setIsMenuOpen(false);
-                }}
-                className="w-full text-left px-4 py-3 rounded-2xl text-violet-700 hover:bg-violet-50 transition"
-              >
-                Admin
-              </button>
-
+              {user?.role === "admin" && (
+                <button
+                  onClick={() => {
+                    setShowAdmin(true);
+                    setIsMenuOpen(false);
+                  }}
+                  className="w-full text-left px-4 py-3 rounded-2xl text-violet-700 hover:bg-violet-50 transition"
+                >
+                  Admin
+                </button>
+              )}
               <div className="my-2 border-t border-violet-100" />
 
               <button

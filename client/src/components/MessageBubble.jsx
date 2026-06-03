@@ -6,9 +6,10 @@ function MessageBubble({ msg, isMine }) {
   const image = msg.image || msg.image_url || msg.file_url;
 
   // Jméno autora zprávy
-  const senderName =
+    const senderName =
     msg.senderName ||
     msg.sender_username ||
+    msg.username ||
     msg.sender?.username ||
     "Uživatel";
 

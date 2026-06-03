@@ -6,13 +6,32 @@ import UserStatus from "./UserStatus";
 function Friends({ onClose, requests, setRequests }) {
     const [activeTab, setActiveTab] = useState('friends');
     const [friends, setFriends] = useState([]);
+    const [blockedUsers, setBlockedUsers] = useState([]);
+
+    const tabs = [
+      { id: "friends", label: "Přátelé", count: friends.length },
+      { id: "requests", label: "Žádosti", count: requests.length },
+      { id: "blocked", label: "Blokovaní", count: blockedUsers.length },
+    ];
   
     useEffect(() => {
-      const loadData = async () => {
+      const loadFriends = async () => {
         const friendsData = await socialService.getFriends();
         setFriends(friendsData);
       };
-      if (activeTab === 'friends') loadData();
+
+      const loadBlockedUsers = async () => {
+        const blockedData = await socialService.getBlockedUsers();
+        setBlockedUsers(blockedData);
+      };
+
+      if (activeTab === "friends") {
+        loadFriends();
+      }
+
+      if (activeTab === "blocked") {
+        loadBlockedUsers();
+      }
     }, [activeTab]);
 
     const handleResponse = async (id, accept) => {
@@ -35,12 +54,24 @@ function Friends({ onClose, requests, setRequests }) {
       }
     };
 
+    const handleUnblockUser = async (userId) => {
+      const result = await socialService.unblockUser(userId);
+
+      if (result.success) {
+        setBlockedUsers(prev =>
+          prev.filter(u => u.id !== userId)
+        );
+      }
+    };
+
+    /*
     const handleReport = async (userId) => {
       if(window.confirm("Opravdu chcete tohoto uživatele nahlásit administrátorům?")) {
         await socialService.reportUser(userId);
         alert("Uživatel byl nahlášen.");
       }
     };
+    */
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 px-4">
@@ -111,7 +142,7 @@ function Friends({ onClose, requests, setRequests }) {
 
                     <button
                       type="button"
-                      onClick={() => handleBlockUser(friend)}
+                      onClick={() => handleBlock(friend.id)}
                       className="rounded-2xl px-3 py-2 text-xs font-semibold text-rose-500 transition hover:bg-rose-50"
                     >
                       Blokovat
@@ -135,11 +166,11 @@ function Friends({ onClose, requests, setRequests }) {
                     className="rounded-3xl border border-violet-100 bg-violet-50/40 px-4 py-3"
                   >
                     <div className="mb-3 flex items-center gap-3">
-                      <ChatAvatar username={req.fromUser.username} size="md" />
+                      <ChatAvatar username={req.username} size="md" />
 
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-sm font-semibold text-violet-900">
-                          {req.fromUser.username}
+                          {req.username}
                         </p>
                         <p className="text-xs text-violet-400">
                           Chce si tě přidat do přátel
@@ -150,7 +181,7 @@ function Friends({ onClose, requests, setRequests }) {
                     <div className="flex justify-end gap-2">
                       <button
                         type="button"
-                        onClick={() => handleRejectRequest(req.id)}
+                        onClick={() => handleResponse(req.id, false)}
                         className="rounded-2xl bg-violet-50 px-4 py-2 text-xs font-semibold text-violet-600 transition hover:bg-violet-100"
                       >
                         Odmítnout
@@ -158,7 +189,7 @@ function Friends({ onClose, requests, setRequests }) {
 
                       <button
                         type="button"
-                        onClick={() => handleAcceptRequest(req)}
+                        onClick={() => handleResponse(req.id, true)}
                         className="rounded-2xl bg-violet-500 px-4 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-violet-600"
                       >
                         Přijmout
@@ -198,7 +229,7 @@ function Friends({ onClose, requests, setRequests }) {
 
                     <button
                       type="button"
-                      onClick={() => handleUnblockUser(user)}
+                      onClick={() => handleUnblockUser(user.id)}
                       className="rounded-2xl bg-white px-3 py-2 text-xs font-semibold text-rose-500 shadow-sm transition hover:bg-rose-50"
                     >
                       Odblokovat
