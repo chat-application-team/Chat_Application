@@ -23,6 +23,7 @@ from .serializers import (
 from users.views import IsAdminUserRole
 from users.models import AuditLog
 from django.db.models import Count, Q
+from django.shortcuts import get_object_or_404
 
 class UserChatsView(generics.ListAPIView):
     serializer_class = ChatSerializer
@@ -106,6 +107,8 @@ class CreateMessageView(APIView):
         if not ChatMember.objects.filter(chat_id=chat_id, user=request.user).exists():
             return Response({"error": "Nemáš přístup do tohoto chatu."}, status=403)
         
+        chat = get_object_or_404(Chat, id=chat_id)
+
         if chat.type == 'private':
             other_member = ChatMember.objects.filter(chat_id=chat_id).exclude(user=request.user).first()
 
@@ -131,7 +134,6 @@ class CreateMessageView(APIView):
             type=message_type
         )
 
-        chat = message.chat
         chat.last_activity = message.created_at
         chat.save()
 

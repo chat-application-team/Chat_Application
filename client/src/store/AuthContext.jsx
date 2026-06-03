@@ -28,13 +28,18 @@ export const AuthProvider = ({ children }) => {
     }, []);
 
     //funkce pro přihlášení
-    const login = async (username, password) => {
+    const login = async (login, password) => {
         try {
-            const response = await axiosClient.post('/api/users/login/', { username, password });
+            const response = await axiosClient.post('/api/users/login/', { login, password });
+            const token = response.data.token;
+
+            localStorage.setItem('accessToken', token);
             
-            localStorage.setItem('accessToken', response.data.access || response.data.token);
-            
-            const userResponse = await axiosClient.get('/api/users/me/');
+            const userResponse = await axiosClient.get('/api/users/me/', {
+                headers: {
+                    Authorization: `Token ${token}`
+                }
+            });
             setUser(userResponse.data);
             setIsAuthenticated(true);
 
@@ -52,9 +57,20 @@ export const AuthProvider = ({ children }) => {
         try{
             const response = await axiosClient.post('/api/users/register/', { username, email, password });
 
-            localStorage.setItem('accessToken', response.data.access || response.data.token);
+            const loginResponse = await axiosClient.post('/api/users/login/', {
+                login: username,
+                password: password
+            });
+
+            const token = loginResponse.data.token
+            localStorage.setItem('accessToken', token);
             
-            const userResponse = await axiosClient.get('/api/users/me/');
+            const userResponse = await axiosClient.get('/api/users/me/', {
+                headers: {
+                    Authorization: `Token ${token}`
+                }
+            });
+            
             setUser(userResponse.data);
             setIsAuthenticated(true);
 

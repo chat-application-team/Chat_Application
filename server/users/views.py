@@ -2,6 +2,7 @@ from rest_framework.views import APIView
 
 from rest_framework.response import Response
 from rest_framework import status, viewsets, filters
+from rest_framework.authtoken.models import Token
 from rest_framework.permissions import (
     IsAuthenticated,
     AllowAny,
@@ -137,8 +138,13 @@ class LoginView(APIView):
             action=f"User {user.username} has successfully logged in."
         )
 
+        token, _ = Token.objects.get_or_create(user=user)
+
         return Response(
-            {"message": "Logged in"},
+            {
+                "message": "Logged in",
+                "token":token.key
+            },
             status=status.HTTP_200_OK
         )
 
