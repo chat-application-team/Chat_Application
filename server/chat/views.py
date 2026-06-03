@@ -14,6 +14,10 @@ from .models import Chat, ChatMember, Message, Notification
 from .serializers import ChatSerializer, MessageSerializer, NotificationSerializer
 
 
+def create_notification(user, text):
+    Notification.objects.create(user=user, text=text)
+
+
 class UserChatsView(generics.ListAPIView):
     serializer_class = ChatSerializer
     permission_classes = [IsAuthenticated]
@@ -40,20 +44,20 @@ class CreateChatView(APIView):
     def post(self, request):
         chat_type = request.data.get("type")
         name = request.data.get("name")
-        desciription = request.data.get("description")
+        description = request.data.get("description")
         other_user_id = request.data.get("other_user_id")
 
-        if chat_type not in ['private', 'group']:
+        if chat_type not in [Chat.PRIVATE, Chat.GROUP]:
             return Response({"error": "Neplatný typ chatu. Musí být 'private' nebo 'group'."}, status=400)
         
-        if chat_type == 'group' and not name:
+        if chat_type == Chat.GROUP and not name:
             return Response({"error": "Skupinový chat musí mít název."}, status=400)
         
         with transaction.atomic():
             chat = Chat.objects.create(
                 type=chat_type,
-                name=name if chat_type == 'group' else None, #Funguje to: pokud je to skupinový chat, použije se název, jinak bude None
-                description=desciription if chat_type == 'group' else None
+                name=name if chat_type == Chat.GROUP else None, #Funguje to: pokud je to skupinový chat, použije se název, jinak bude None
+                description=description if chat_type == Chat.GROUP else None
             )
 
             ChatMember.objects.create(
@@ -62,13 +66,13 @@ class CreateChatView(APIView):
                 role='owner'
             )
 
-            if chat_type == 'private':
+            if chat_type == Chat.PRIVATE:
                 if not other_user_id:
                     return Response({"error": "Pro soukromý chat musí být zadán 'other_user_id'."}, status=400)
                 
                 is_blocked = Relationship.objects.filter(
                     (Q(user_a=request.user, user_b_id=other_user_id) | Q(user_a_id=other_user_id, user_b=request.user)), #Detailni vysvetleni: Tento dotaz hledá vztahy, kde buď uživatel A je aktuální uživatel a uživatel B je ten druhý, nebo naopak. To zajišťuje, že se zkontrolují oba směry vztahu mezi těmito dvěma uživateli. 
-                    type='block'
+                    type=Relationship.BLOCK
                 ).exists()
 
                 if is_blocked:
@@ -96,13 +100,13 @@ class CreateMessageView(APIView):
         if not ChatMember.objects.filter(chat_id=chat_id, user=request.user).exists():
             return Response({"error": "Nemáš přístup do tohoto chatu."}, status=403)
         
-        if chat.type == 'private':
+        if chat.type == Chat.PRIVATE:
             other_member = ChatMember.objects.filter(chat_id=chat_id).exclude(user=request.user).first()
 
             if other_member:
                 is_blocked = Relationship.objects.filter(
                     (Q(user_a=request.user, user_b=other_member.user) | Q(user_a=other_member.user, user_b=request.user)),
-                     type='block'
+                     type=Relationship.BLOCK
                 ).exists()
 
                 if is_blocked:
@@ -124,6 +128,15 @@ class CreateMessageView(APIView):
         chat = message.chat
         chat.last_activity = message.created_at
         chat.save()
+
+        other_members = ChatMember.objects.filter(chat_id=chat_id).exclude(user=request.user)
+        for member in other_members:
+            if chat.type == Chat.PRIVATE:
+                notification_text = f"Nová zpráva od {request.user.username} v soukromém chatu."
+            else:
+                notification_text = f"Nová zpráva od {request.user.username} ve skupinovém chatu '{chat.name}'."
+            
+            create_notification(user=member.user, text=notification_text)
 
         channel_layer = get_channel_layer()
         async_to_sync(channel_layer.group_send)(
@@ -153,12 +166,12 @@ class AddGroupMemberView(APIView):
         except Chat.DoesNotExist:
             return Response({"error": "Chat neexistuje."}, status=404)
     
-        if chat.type != 'group':
+        if chat.type != Chat.GROUP:
             return Response({"error": "Tato akce je povolena pouze pro skupinové chaty."}, status=400)
         
         try:
             current_member = ChatMember.objects.get(chat=chat, user=request.user)
-            if current_member.role not in ['owner', 'admin']:
+            if current_member.role not in [ChatMember.OWNER, ChatMember.ADMIN]:
                 return Response({"error": "Nemáš práva přidávat členy. Musíš být vlastníkem nebo administrátorem skupiny."}, status=403)
         
         except ChatMember.DoesNotExist:
@@ -181,6 +194,8 @@ class AddGroupMemberView(APIView):
             user=user_to_add,
             role='member'
         )
+
+        create_notification(user=user_to_add, text=f"Byl jsi přidán do skupinového chatu '{chat.name}'.")
         
         return Response({"status": f"Uživatel {user_to_add.username} byl úspěšně přidán do chatu."})
     
@@ -194,7 +209,7 @@ class LeaveGroupView(APIView):
         except Chat.DoesNotExist:
             return Response({"error": "Chat neexistuje."}, status=404)
             
-        if chat.type != 'group':
+        if chat.type != Chat.GROUP:
             return Response({"error": "Ze soukromého chatu nelze odejít."}, status=400)
             
         try:
@@ -203,7 +218,7 @@ class LeaveGroupView(APIView):
         except ChatMember.DoesNotExist:
             return Response({"error": "Nejsi členem této skupiny."}, status=403)
             
-        if member.role == 'owner':
+        if member.role == ChatMember.OWNER:
             other_members_count = ChatMember.objects.filter(chat=chat).exclude(user=request.user).count()
             if other_members_count == 0:
                 return Response({"error": "Jako Vlastník nemůžeš odejít, dokud na někoho nepřevedeš vlastnictví nebo dokud nezrušíš skupinu."}, status=403)
@@ -223,12 +238,12 @@ class RemoveGroupMemberView(APIView):
         except Chat.DoesNotExist:
             return Response({"error": "Chat neexistuje."}, status=404)
         
-        if chat.type != 'group':
+        if chat.type != Chat.GROUP:
             return Response({"error": "Tato akce je povolena pouze pro skupinové chaty."}, status=400)
         
         try:
             current_member = ChatMember.objects.get(chat=chat, user=request.user)
-            if current_member.role not in ['owner', 'admin']:
+            if current_member.role not in [ChatMember.OWNER, ChatMember.ADMIN]:
                 return Response({"error": "Nemáš práva odstraňovat členy. Musíš být vlastníkem nebo administrátorem skupiny."}, status=403)
 
         except ChatMember.DoesNotExist:
@@ -244,13 +259,16 @@ class RemoveGroupMemberView(APIView):
         except ChatMember.DoesNotExist:
             return Response({"error": "Uživatel, kterého chceš odstranit, není členem tohoto chatu."}, status=404)
 
-        if member_to_remove.role == 'owner':
+        if member_to_remove.role == ChatMember.OWNER:
             return Response({"error": "Vlastníka nelze odstranit."}, status=403)
         
-        if current_member.role == 'admin' and member_to_remove.role == 'admin':
+        if current_member.role == ChatMember.ADMIN and member_to_remove.role == ChatMember.ADMIN:
             return Response({"error": "Administrátor nemůže odstranit jiného administrátora."}, status=403)
         
         member_to_remove.delete()
+
+        create_notification(user=member_to_remove.user, text=f"Byl jsi odstraněn z skupinového chatu '{chat.name}'.")
+
         return Response({"status": f"Uživatel {member_to_remove.user.username} byl úspěšně odstraněn z chatu."})
         
     
@@ -270,7 +288,7 @@ class DeleteChatView(APIView):
         except ChatMember.DoesNotExist:
             return Response({"error": "Nejsi členem tohoto chatu."}, status=403)
             
-        if chat.type == 'group' and member.role != 'owner':
+        if chat.type == Chat.GROUP and member.role != ChatMember.OWNER:
             return Response({"error": "Pouze Vlastník může smazat skupinový chat."}, status=403)
             
         chat.delete()
@@ -287,12 +305,12 @@ class ChangeMemberRoleView(APIView):
         except Chat.DoesNotExist:
             return Response({"error": "Chat neexistuje."}, status=404)
         
-        if chat.type != 'group':
+        if chat.type != Chat.GROUP:
             return Response({"error": "V soikromém chatu nelze měnit role členů."}, status=400)
         
         try:
             current_member = ChatMember.objects.get(chat=chat, user=request.user)
-            if current_member.role not in ['owner', 'admin']:
+            if current_member.role not in [ChatMember.OWNER, ChatMember.ADMIN]:
                 return Response({"error": "Nemáš práva měnit role členů. Musíš být vlastníkem nebo administrátorem skupiny."}, status=403)
             
         except ChatMember.DoesNotExist:
@@ -304,7 +322,7 @@ class ChangeMemberRoleView(APIView):
         if not target_user_id or not new_role:
             return Response({"error": "Musíš zadat 'user_id' a 'role' pro změnu role člena."}, status=400)
         
-        if new_role not in ['admin', 'member']:
+        if new_role not in [ChatMember.ADMIN, ChatMember.MEMBER]:
             return Response({"error": "Neplatná role. Role musí být 'admin' nebo 'member'."}, status=400)
         
         try:
@@ -313,14 +331,16 @@ class ChangeMemberRoleView(APIView):
         except ChatMember.DoesNotExist:
             return Response({"error": "Uživatel, jehož roli chceš změnit, není členem tohoto chatu."}, status=404)
         
-        if member_to_change.role == 'owner':
+        if member_to_change.role == ChatMember.OWNER:
             return Response({"error": "Roli vlastníka nelze měnit."}, status=403)
         
-        if current_member.role == 'admin' and member_to_change.role == 'admin':
+        if current_member.role == ChatMember.ADMIN and member_to_change.role == ChatMember.ADMIN:
             return Response({"error": "Správce nemůže měnit roli jiného správce."}, status=403)
         
         member_to_change.role = new_role
         member_to_change.save()
+
+        create_notification(user=member_to_change.user, text=f"Tvá role v skupinovém chatu '{chat.name}' byla změněna na {new_role}.")  
 
         return Response({"status": f"Role uživatele {member_to_change.user.username} byla úspěšně změněna na {new_role}."})
         
@@ -338,7 +358,7 @@ class MarkNotificationReadView(APIView):
 
     def post(self, request, notification_id):
         try:
-            notification = Notification.objectsl.get(id=notification_id, user=request.user)
+            notification = Notification.objects.get(id=notification_id, user=request.user)
             notification.is_read = True
             notification.save()
             return Response({"status": "Notifikace označena jako přečtená."})
