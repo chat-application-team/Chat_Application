@@ -59,8 +59,8 @@ class CustomUser(AbstractUser):
         return self.profile
 
 def user_avatar_path(instance, filename):
-        ext = filename.split('.')[-1]
-        return os.path.join("avatars", f"user_{instance.user.id}.{ext}")
+    ext = filename.split('.')[-1]
+    return os.path.join("avatars", f"user_{instance.user.id}.{ext}")
 
 class Profile(models.Model):
 
