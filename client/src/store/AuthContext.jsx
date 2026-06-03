@@ -13,42 +13,29 @@ export const AuthProvider = ({ children }) => {
         const checkAuth = async () => {
             const token = localStorage.getItem('accessToken');
             if (token) {
-
-                //bypass pro testování bez backendu
-                setUser({ username: 'Admin bypass' });
-                setIsAuthenticated(true);
-
-                /*
                 try {
-                    const response = await axiosClient.get('/profile/');
+                    const response = await axiosClient.get('/api/users/me/'); 
                     setUser(response.data);
                     setIsAuthenticated(true);
                 } catch (error) {
+                    console.error("Token vypršel.");
                     logout();
-                }*/
+                }
             }
             setLoading(false);
         };
-
         checkAuth();
     }, []);
 
     //funkce pro přihlášení
     const login = async (username, password) => {
-
-        //admin bypass
-        localStorage.setItem('accessToken', 'false-dev-token');
-        setUser({ username: username });
-        setIsAuthenticated(true);
-        return { success: true };
-
-        /*
         try {
-            const response = await axiosClient.post('/auth/login/', { username, password });
-
-            //Uložení tokenu
-            localStorage.setItem('accessToken', response.data.access);
-            setUser(response.data.user);
+            const response = await axiosClient.post('/api/users/login/', { username, password });
+            
+            localStorage.setItem('accessToken', response.data.access || response.data.token);
+            
+            const userResponse = await axiosClient.get('/api/users/me/');
+            setUser(userResponse.data);
             setIsAuthenticated(true);
 
             return { success: true };
@@ -56,27 +43,20 @@ export const AuthProvider = ({ children }) => {
             console.error('Login error:', error);
             return {
                 success: false,
-                message: error.response?.data?.detail || 'Špatný jmeno nebo heslo'
+                message: error.response?.data?.detail || 'Špatné jméno nebo heslo'
             };
-        }*/
+        }
     };
 
-    const register = async (username, password) => {
-        //admin bypass
-        localStorage.setItem('accessToken', 'false-dev-token')
-        setUser({ username: username });
-        setIsAuthenticated(true);
-        return { success: true };
-        /*
+    const register = async (username, email, password) => {
         try{
-            //tohle je adresa
-            const response = await axiosClient.post('/auth/register/', { username, email, password });
+            const response = await axiosClient.post('/api/users/register/', { username, email, password });
 
-            localStorage.setItem('accessToken', response.data.access);
-            localStorage.setItem('refreshToken', response.data.refresh);
-
-            setUser({ username: username });
-            setIsAuthenticated(true)
+            localStorage.setItem('accessToken', response.data.access || response.data.token);
+            
+            const userResponse = await axiosClient.get('/api/users/me/');
+            setUser(userResponse.data);
+            setIsAuthenticated(true);
 
             return { success: true };
         } catch (error) {
@@ -84,12 +64,17 @@ export const AuthProvider = ({ children }) => {
             return {
                 success: false,
                 message: error.response?.data?.detail || 'Registrace se nezdařila.'
-            }
-        }*/
+            };
+        }
     }
 
     //funkce pro odhlášení
-    const logout = () => {
+    const logout = async () => {
+        try {
+            await axiosClient.post('/api/users/logout/');
+        } catch (e) {
+            console.error("Chyba logoutu", e);
+        }
         localStorage.removeItem('accessToken');
         localStorage.removeItem('refreshToken');
         setUser(null);

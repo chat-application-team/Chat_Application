@@ -1,12 +1,10 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../store/AuthContext';
-import { useNavigate, Link } from 'react-router-dom';
 
-function Login() {
+function Login({ onSwitchToRegister }) {
     const { login } = useAuth();
     const navigate = useNavigate();
-
-    //Lokalní stavy
     const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
@@ -14,56 +12,34 @@ function Login() {
     const handleSubmit = async (e) => {
         e.preventDefault();
         setError('');
-
         const result = await login(username, password);
-
+        
         if (result.success) {
-            //Pokud v poho, presměrujeme na chat
-            navigate('/');
+            navigate('/chat');
         } else {
-            //Pokud selhalo chyba z backendu
             setError(result.message);
         }
     };
 
     return (
-        <div className="flex h-screen items-center justify-center bg-gray-100">
-        <form onSubmit={handleSubmit} className="w-full max-w-sm bg-white p-6 rounded shadow-md">
-            <h2 className="text-xl font-bold mb-4">Přihlášení do chatu</h2>
-            
-            {error && <div className="mb-3 text-sm text-red-500 font-semibold">{error}</div>}
-            
-            <div className="mb-4">
-            <label className="block text-sm font-medium mb-1">Uživatelské jméno</label>
-            <input 
-                type="text" 
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                className="w-full p-2 border rounded" 
-                required
-            />
-            </div>
-
-            <div className="mb-6">
-            <label className="block text-sm font-medium mb-1">Heslo</label>
-            <input 
-                type="password" 
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full p-2 border rounded" 
-                required
-            />
-            </div>
-
-            <button type="submit" className="w-full bg-blue-500 text-white p-2 rounded font-bold">
-            Přihlásit se
-            </button>
-
-            <div className="mt-4 text-center text-sm">
-                Nemáte účet? <Link to="/auth/register" className="text-blue-500 hover:underline">Zaregistrujte se</Link>
-            </div>
-        </form>
-        </div>
+    <div className="flex items-center justify-center h-screen bg-gray-100">
+      <form onSubmit={handleSubmit} className="bg-white p-8 rounded shadow-md w-96">
+        <h2 className="text-2xl font-bold mb-6 text-center">Přihlášení</h2>
+        {error && <div className="bg-red-100 text-red-700 p-2 mb-4 rounded text-sm text-center">{error}</div>}
+        <input 
+          type="text" placeholder="Uživatelské jméno" value={username} onChange={(e) => setUsername(e.target.value)} required
+          className="w-full p-2 mb-4 border rounded"
+        />
+        <input 
+          type="password" placeholder="Heslo" value={password} onChange={(e) => setPassword(e.target.value)} required
+          className="w-full p-2 mb-6 border rounded"
+        />
+        <button type="submit" className="w-full bg-blue-500 text-white p-2 rounded hover:bg-blue-600 transition font-bold">Přihlásit se</button>
+        <p className="mt-4 text-center text-sm">
+          Nemáte účet? <span onClick={() => navigate('/auth/register')} className="text-blue-500 cursor-pointer hover:underline">Zaregistrujte se</span>
+        </p>
+      </form>
+    </div>
   );
 }
 

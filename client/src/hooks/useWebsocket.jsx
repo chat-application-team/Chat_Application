@@ -1,66 +1,53 @@
-import { useState, useEffect, useRef } from 'react';
+import { useEffect, useRef } from 'react';
 
-const useWebsocket = (roomName) => {
-    //se co prijde ze serveru
-    const [messages, setMessages] = useState([]);
-    const [friendRequests, setFriendRequests] = useState([]);
-
-    const ws = useRef(null);
+const useWebSocket = (user, onMessageReceived, onFriendRequest, onSystemAction) => {
+  const ws = useRef(null);
 
     useEffect(() => {
-        if (!roomName) return;
+        if (!user) return; 
 
         const token = localStorage.getItem('accessToken');
+        
+        const WS_URL = `ws://localhost:8000/ws/chat/?token=${token}`; 
+        
+        ws.current = new WebSocket(WS_URL);
 
-        const wsUrl = `ws://127.0.0.1:8000/ws/chat/${roomName}/?token=${token}`;
-
-        ws.current = new WebSocket(wsUrl);
-
-        ws.current.onopen = () => {
-            console.log('WebSocket připojen');
-        };
-
+        ws.current.onopen = () => console.log('WebSocket úspěšně připojen!');
+        ws.current.onclose = () => console.log('WebSocket odpojen!');
+        
         ws.current.onmessage = (event) => {
-            const incomingData = JSON.parse(event.data);
+            const data = JSON.parse(event.data);
+            console.log('WS přijato:', data);
 
-            switch (incomingData.type) {
+            switch (data.type) {
                 case 'CHAT_MESSAGE':
-                setMessages((prev) => [...prev, incomingData]);
-                break;
-
+                    if (onMessageReceived) onMessageReceived(data);
+                    break;
                 case 'FRIEND_REQUEST':
-                // Přidá novou žádost do našeho sdíleného seznamu
-                setFriendRequests((prev) => [...prev, incomingData]);
-                console.log('Nová žádost o přátelství!');
-                break;
-
+                    if (onFriendRequest) onFriendRequest(data);
+                    break;
+                case 'SYSTEM_ACTION':
+                    if (onSystemAction) onSystemAction(data);
+                    break;
                 default:
-                console.log('Neznámý typ zprávy:', incomingData);
+                    console.warn('Neznámý typ WS zprávy:', data);
             }
-        };
-
-        ws.current.onerror = (error) => {
-            console.error('WebSocket chyba:', error);
         };
 
         return () => {
-            if (ws.current) {
-                ws.current.close();
-            }
+            if (ws.current) ws.current.close();
         };
-    }, [roomName]);
+    }, [user]);
 
-    const sendMessage = (message) => {
+    const sendMessage = (msgObj) => {
         if (ws.current && ws.current.readyState === WebSocket.OPEN) {
-            ws.current.send(JSON.stringify({
-                text: message,
-            }));
+            ws.current.send(JSON.stringify(msgObj));
         } else {
-            console.warn('Socket není připojen');
+            console.error('WebSocket není připojen, zprávu nelze odeslat!');
         }
     };
-
-    return { messages, setMessages };
+    
+    return { sendMessage };
 };
 
-export default useWebsocket;
+export default useWebSocket;
