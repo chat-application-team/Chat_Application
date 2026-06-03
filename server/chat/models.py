@@ -217,6 +217,8 @@ class Notification(models.Model):
     NOTIFICATION_MESSAGE = 'message'
     NOTIFICATION_FRIEND_REQUEST = 'friend_request'
     NOTIFICATION_GROUP_INVITE = 'group_invite'
+    NOTIFICATION_GROUP_REMOVE = 'group_remove'
+    NOTIFICATION_ROLE_CHANGED = 'role_changed'
     TYPE_CHOICES = [
         (NOTIFICATION_MESSAGE, 'Zpráva'),
         (NOTIFICATION_FRIEND_REQUEST, 'Žádost'),
