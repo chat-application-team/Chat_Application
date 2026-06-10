@@ -19,14 +19,18 @@ export const adminService = {
 
     updateUser: async (userId, data) => {
         try {
-            const response = await axiosClient.patch(`/api/users/admin/management/${userId}`, data);
+            const response = await axiosClient.patch(`/api/users/admin/management/${userId}/`, data);
             return response.data;
         } catch (error) { throw error; }
     },
 
-    bulkAction: async (actionType, userIds) => {
+    bulkAction: async (actionType, userIds, role = null) => {
         try {
-            const response = await axiosClient.post('/api/users/admin/bulk-action/', { action: actionType, users: userIds });
+            const response = await axiosClient.post('/api/users/admin/bulk-action/', {
+                action: actionType,
+                user_ids: userIds,
+                ...(role ? { role } : {})
+            });
             return response.data;
         } catch (error) { throw error; }
     },
@@ -43,7 +47,7 @@ export const adminService = {
 
     getAuditLogDetails: async (logId) => {
         try {
-            const response = await axiosClient.get(`/api/users/admin/audit-logs/${logId}`);
+            const response = await axiosClient.get(`/api/users/admin/audit-logs/${logId}/`);
             return response.data;
         } catch (error) { return null; }
     },
@@ -53,7 +57,9 @@ export const adminService = {
     // Zabanování uživatele 
     banUser: async (userId) => {
         try {
-            const response = await axiosClient.patch(`/api/users/admin/management/${userId}`, { status: 'banned' });
+            const response = await axiosClient.patch(`/api/users/admin/management/${userId}/`, {
+                is_active: false
+            });
             return response.data;
         } catch (error) { throw error; }
     },
@@ -69,7 +75,7 @@ export const adminService = {
     // Smazání skupiny
     deleteGroup: async (chatId) => {
         try {
-            const response = await axiosClient.delete(`/api/chat/admin/group-chats/${chatId}`);
+            const response = await axiosClient.delete(`/api/chat/admin/group-chats/${chatId}/`);
             return response.data;
         } catch (error) { throw error; }
     },
@@ -83,10 +89,40 @@ export const adminService = {
 
     deleteMessage: async (messageId) => {
         try {
-            const response = await axiosClient.delete(`/api/chat/admin/messages/${messageId}`);
+            const response = await axiosClient.delete(`/api/chat/admin/messages/${messageId}/`);
             return response.data;
         } catch (error) { throw error; }
-    }
+    },
+
+    activateUser: async (userId) => {
+        try {
+            const response = await axiosClient.patch(`/api/users/admin/management/${userId}/`, {
+                is_active: true
+            });
+            return response.data;
+        } catch (error) { throw error; }
+    },
+
+    resolveReport: async (reportId) => {
+        try {
+            const response = await axiosClient.post(`/api/chat/report/${reportId}/resolve/`);
+            return response.data;
+        } catch (error) { throw error; }
+    },
+
+    getReports: async () => {
+        try {
+            const response = await axiosClient.get('/api/chat/report/');
+            return response.data;
+        } catch (error) { return []; }
+    },
+
+    getReportDetails: async (reportId) => {
+        try {
+            const response = await axiosClient.get(`/api/chat/report/${reportId}/`);
+            return response.data;
+        } catch (error) { return null; }
+    },
 
 };
 

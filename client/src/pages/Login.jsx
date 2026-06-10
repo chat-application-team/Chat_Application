@@ -1,6 +1,6 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../store/AuthContext';
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { useAuth } from "../store/AuthContext";
 
 function Login({ onSwitchToRegister }) {
     const { login } = useAuth();
@@ -21,22 +21,65 @@ function Login({ onSwitchToRegister }) {
         }
     };
 
-    return (
-    <div className="flex items-center justify-center h-screen bg-gray-100">
-      <form onSubmit={handleSubmit} className="bg-white p-8 rounded shadow-md w-96">
-        <h2 className="text-2xl font-bold mb-6 text-center">Přihlášení</h2>
-        {error && <div className="bg-red-100 text-red-700 p-2 mb-4 rounded text-sm text-center">{error}</div>}
-        <input 
-          type="text" placeholder="Uživatelské jméno" value={username} onChange={(e) => setUsername(e.target.value)} required
-          className="w-full p-2 mb-4 border rounded"
-        />
-        <input 
-          type="password" placeholder="Heslo" value={password} onChange={(e) => setPassword(e.target.value)} required
-          className="w-full p-2 mb-6 border rounded"
-        />
-        <button type="submit" className="w-full bg-blue-500 text-white p-2 rounded hover:bg-blue-600 transition font-bold">Přihlásit se</button>
-        <p className="mt-4 text-center text-sm">
-          Nemáte účet? <span onClick={() => navigate('/auth/register')} className="text-blue-500 cursor-pointer hover:underline">Zaregistrujte se</span>
+  return (
+    <div className="flex h-screen items-center justify-center bg-violet-50 px-4">
+      <form onSubmit={handleSubmit} className="w-full max-w-md rounded-3xl border border-violet-100 bg-white p-8 shadow-2xl">
+
+        <div className="mb-6 text-center">
+          <p className="text-xs font-semibold uppercase tracking-wide text-violet-400">
+            Vítej zpět
+          </p>
+
+          <h2 className="mt-1 text-3xl font-bold text-violet-900">
+            Přihlášení
+          </h2>
+
+          <p className="mt-2 text-sm text-violet-400">
+            Přihlas se do svého účtu.
+          </p>
+        </div>
+
+        {error && (
+          <div className="mb-4 rounded-2xl bg-rose-50 px-4 py-3 text-center text-sm font-semibold text-rose-600">
+            {error}
+          </div>
+        )}
+
+        <div className="space-y-4">
+          <input
+            type="text"
+            placeholder="Uživatelské jméno"
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+            required
+            className="w-full rounded-2xl border border-violet-100 bg-violet-50/40 px-4 py-3 text-sm text-violet-900 outline-none transition placeholder:text-violet-300 focus:border-violet-300 focus:bg-white focus:ring-2 focus:ring-violet-100"
+          />
+
+          <input
+            type="password"
+            placeholder="Heslo"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+            className="w-full rounded-2xl border border-violet-100 bg-violet-50/40 px-4 py-3 text-sm text-violet-900 outline-none transition placeholder:text-violet-300 focus:border-violet-300 focus:bg-white focus:ring-2 focus:ring-violet-100"
+          />
+        </div>
+
+        <button
+          type="submit"
+          className="mt-6 w-full rounded-2xl bg-violet-500 px-5 py-3 text-sm font-semibold text-white shadow-md transition hover:bg-violet-600 hover:shadow-lg"
+        >
+          Přihlásit se
+        </button>
+
+        <p className="mt-5 text-center text-sm text-violet-400">
+          Nemáte účet?{" "}
+          <span
+            onClick={() => navigate("/auth/register")}
+            className="cursor-pointer font-semibold text-violet-600 hover:underline"
+          >
+            Zaregistrujte se
+          </span>
         </p>
       </form>
     </div>

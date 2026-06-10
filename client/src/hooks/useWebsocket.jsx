@@ -1,14 +1,14 @@
 import { useEffect, useRef } from 'react';
 
-const useWebSocket = (user, onMessageReceived, onFriendRequest, onSystemAction) => {
+const useWebSocket = (user, chatId, onMessageReceived) => {
   const ws = useRef(null);
 
     useEffect(() => {
-        if (!user) return; 
+        if (!user?.id || !chatId) return;
 
         const token = localStorage.getItem('accessToken');
         
-        const WS_URL = `ws://localhost:8000/ws/chat/?token=${token}`; 
+        const WS_URL = `ws://127.0.0.1:8000/ws/chat/${chatId}/?token=${token}`;
         
         ws.current = new WebSocket(WS_URL);
 

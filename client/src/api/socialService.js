@@ -20,30 +20,33 @@ export const socialService = {
     //POST posilani zadosti o frienda
     sendFriendRequest: async (userId) => {
         try {
-            await axiosClient.post('/api/users/relations/requests/', { target_user_id: userId });
+            await axiosClient.post('/api/users/relations/requests/', { user_id: userId });
             return { success: true };
         } catch (error) { return { success: false }; }
     },
 
     //PATCH prijeti zadosti nebo ne
-    respondToRequest: async (requestId, accept) => {
+    respondToRequest: async (userId, accept) => {
         try {
-            await axiosClient.patch(`/api/users/relations/requests/${requestId}/`, { status: accept ? 'accepted' : 'rejected' });
+            if (accept) {
+            await axiosClient.patch('/api/users/relations/requests/', {
+                user_id: userId
+            });
+            } else {
+            await axiosClient.delete(`/api/users/relations/delete/${userId}/`);
+            }
+
             return { success: true };
-        } catch (error) { return { success: false }; }
+        } catch (error) {
+            console.error("Friend request response failed:", error.response?.data || error);
+            return { success: false };
+        }
     },
 
     //POST zablokovani
     blockUser: async (userId) => {
         try {
-            await axiosClient.post(`/api/users/relation/block/`, { target_user_id: userId });
-            return { success: true };
-        } catch (error) { return { success: false }; }
-    },
-
-    reportUser: async (userId, reason = 'Porušení pravidel') => {
-        try {
-            await axiosClient.post(`/api/users/relation/report/`, { target_user_id: userId, reason });
+            await axiosClient.post('/api/users/relations/block/', { user_id: userId });
             return { success: true };
         } catch (error) { return { success: false }; }
     },
@@ -59,7 +62,7 @@ export const socialService = {
     // POST odblokovani
     unblockUser: async (userId) => {
         try {
-            await axiosClient.delete(`/api/users/relations/delete/${userId}`);
+            await axiosClient.delete(`/api/users/relations/delete/${userId}/`);
             return { success: true };
         } catch (error) { return { success: false }; }
     }
