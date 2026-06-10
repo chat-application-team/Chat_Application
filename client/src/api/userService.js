@@ -5,7 +5,7 @@ export const userService = {
         if (!query.trim()) return [];
         try {
             // Endpoint podporuje vyhledávání přes ?search= 
-            const response = await axiosClient.get(`/api/users/search/?search=${query}`);
+            const response = await axiosClient.get(`/api/users/search?search=${encodeURIComponent(query)}`);
             return response.data;
         } catch (error) {
             console.error('Chyba při vyhledávání uživatelů:', error);
@@ -16,7 +16,7 @@ export const userService = {
     // Získání detailu konkrétního uživatele
     getUserProfile: async (userId) => {
         try {
-            const response = await axiosClient.get(`/api/users/${userId}`);
+            const response = await axiosClient.get(`/api/users/${userId}/`);
             return response.data;
         } catch (error) {
             return null;
@@ -24,19 +24,28 @@ export const userService = {
     },
 
     updateProfile: async (data) => {
-        try {
-            // Úprava vlastního profilu 
-            const response = await axiosClient.patch('/api/users/me/update/', data);
-            return { success: true, data: response.data };
-        } catch (error) {
-            return { success: false, message: error.response?.data?.detail || 'Chyba při ukládání' };
-        }
+    try {
+        const response = await axiosClient.patch(
+        "/api/users/me/update/",
+        data
+        );
+
+        return { success: true, data: response.data };
+    } catch (error) {
+        return {
+        success: false,
+        message: error.response?.data?.detail || "Chyba při ukládání",
+        };
+    }
     },
 
-    changePassword: async (newPassword) => {
+    //Změna hesla
+    changePassword: async (oldPassword, newPassword) => {
         try {
-            // Změna hesla 
-            await axiosClient.post('/api/users/me/change-password/', { password: newPassword });
+            await axiosClient.post('/api/users/me/change-password/', {
+                old_password: oldPassword,
+                new_password: newPassword
+            });
             return { success: true };
         } catch (error) {
             return { success: false, message: error.response?.data?.detail || 'Nelze změnit heslo' };
@@ -56,12 +65,29 @@ export const userService = {
     // Udržovací ping (např. pro zjištění, že je server online)
     pingStatus: async () => {
         try {
-            const response = await axiosClient.get('/api/users/me/ping/');
+            const response = await axiosClient.post('/api/users/me/ping/');
             return response.data;
         } catch (error) {
             return null;
         }
-    }
+    },
+
+    updateStatus: async (status) => {
+        try {
+            const response = await axiosClient.patch('/api/users/me/update/', {
+            profile: {
+                status
+            }
+            });
+
+            return { success: true, data: response.data };
+        } catch (error) {
+            return {
+            success: false,
+            message: error.response?.data?.detail || 'Nelze změnit status'
+            };
+        }
+    },
 };
 
 export default userService;

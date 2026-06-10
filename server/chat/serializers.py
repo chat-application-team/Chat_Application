@@ -29,9 +29,22 @@ class MessageSerializer(serializers.ModelSerializer):
         fields = ['id', 'chat', 'sender', 'content', 'type', 'created_at', 'is_read', 'read_at', 'edited_at', 'attachments']
 
 class ChatSerializer(serializers.ModelSerializer):
+    other_user = serializers.SerializerMethodField()
     class Meta:
         model = Chat
-        fields = ['id', 'type', 'name', 'image', 'description', 'last_activity', 'created_at']
+        fields = ['id', 'type', 'name', 'image', 'description', 'last_activity', 'created_at', 'other_user']
+
+    def get_other_user(self, obj):
+        request = self.context.get('request')
+        if not request or not request.user:
+            return None
+        
+        if obj.type == Chat.PRIVATE:
+            other_member = obj.members.filter(chat=obj).exclude(user=request.user).first()
+            if other_member:
+                return CustomUserSerializer(other_member.user).data
+        
+        return None
 
 class NotificationSerializer(serializers.ModelSerializer):
     class Meta:
