@@ -1,12 +1,12 @@
 import { useState, useEffect } from 'react';
 import { adminService } from '../api/adminService';
 
-function AdminDashboard() {
+function AdminDashboard({onBack}) {
     const [activeTab, setActiveTab] = useState('users');
 
     const [users, setUsers] = useState([]);
     const [groups, setGroups] = useState([]);
-    const [stats, setStats] = useState({ totalUsers: 0, activeGroups: 0, bannedUsers: 0 });
+    const [stats, setStats] = useState({ totalUsers: 0, activeUsers: 0, adminsCount: 0, newUsersToday: 0, messagesCount: 0, dmCount: 0, groupChatCount: 0 });
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
@@ -18,8 +18,12 @@ function AdminDashboard() {
                 
                 setStats({
                     totalUsers: fetchedStats?.total_users || fetchedUsers.length,
-                    activeGroups: fetchedStats?.total_groups || fetchedGroups.length,
-                    bannedUsers: fetchedUsers.filter(u => u.status === 'banned' || u.is_active === false).length
+                    activeUsers: fetchedStats?.active_users || 0,
+                    adminsCount: fetchedStats?.admins_count || 0,
+                    newUsersToday: fetchedStats?.new_users_today || 0,
+                    messagesCount: fetchedStats?.messages_count || 0,
+                    dmCount: fetchedStats?.dm_count || 0,
+                    groupChatCount: fetchedStats?.group_chat_count || 0,
                 });
                 setUsers(fetchedUsers);
                 setGroups(fetchedGroups);
@@ -37,17 +41,17 @@ function AdminDashboard() {
             try {
                 await adminService.banUser(id);
             
-                setUsers(users.map(u => u.id === id ? { ...u, status: 'banned', is_active: false } : u));
-                setStats(prev => ({ ...prev, bannedUsers: prev.bannedUsers + 1 }));
-            
-                if (sendWebSocketMessage) {
+                setUsers(users.map(u => u.id === id ? { ...u, is_active: false } : u));
+                setStats(prev => ({ ...prev, activeUsers: prev.activeUsers - 1 }));
+                
+                /*if (sendWebSocketMessage) {
                     sendWebSocketMessage({
                         type: 'SYSTEM_ACTION',
                         action: 'FORCE_LOGOUT',
                         targetUserId: id,
                         reason: 'Porušení pravidel serveru.'
                     });
-                }
+                }*/
             } catch (error) {
                 alert("Nepodařilo se zabanovat uživatele. Zkontrolujte připojení k serveru.");
             }
@@ -100,12 +104,28 @@ function AdminDashboard() {
                 <p className="text-4xl font-bold text-blue-600 mt-2">{stats.totalUsers}</p>
               </div>
               <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-                <h3 className="text-gray-500 text-sm font-bold uppercase">Aktivní skupiny</h3>
-                <p className="text-4xl font-bold text-green-600 mt-2">{stats.activeGroups}</p>
+                <h3 className="text-gray-500 text-sm font-bold uppercase">Aktivní uživatelé</h3>
+                <p className="text-4xl font-bold text-green-600 mt-2">{stats.activeUsers}</p>
               </div>
               <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-                <h3 className="text-gray-500 text-sm font-bold uppercase">Zabanovaní</h3>
-                <p className="text-4xl font-bold text-red-600 mt-2">{stats.bannedUsers}</p>
+                <h3 className="text-gray-500 text-sm font-bold uppercase">Počet adminů</h3>
+                <p className="text-4xl font-bold text-red-600 mt-2">{stats.adminsCount}</p>
+              </div>
+              <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+                <h3 className="text-gray-500 text-sm font-bold uppercase">Počet dnešních nových uživatelů</h3>
+                <p className="text-4xl font-bold text-red-600 mt-2">{stats.newUsersToday}</p>
+              </div>
+              <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+                <h3 className="text-gray-500 text-sm font-bold uppercase">Celkem zpráv</h3>
+                <p className="text-4xl font-bold text-red-600 mt-2">{stats.messagesCount}</p>
+              </div>
+              <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+                <h3 className="text-gray-500 text-sm font-bold uppercase">Počet soukromých chatů</h3>
+                <p className="text-4xl font-bold text-red-600 mt-2">{stats.dmCount}</p>
+              </div>
+              <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+                <h3 className="text-gray-500 text-sm font-bold uppercase">Počet skupinových chatů</h3>
+                <p className="text-4xl font-bold text-red-600 mt-2">{stats.groupChatCount}</p>
               </div>
             </div>
           </div>
@@ -129,15 +149,15 @@ function AdminDashboard() {
                     <tr key={u.id} className="border-b border-gray-100 hover:bg-gray-50">
                       <td className="p-4 font-medium text-gray-800">{u.username}</td>
                       <td className="p-4">
-                        <span className={`px-2 py-1 text-xs rounded-full font-bold ${u.is_superuser ? 'bg-purple-100 text-purple-700' : 'bg-gray-200 text-gray-700'}`}>
-                          {u.is_superuser ? 'Admin' : 'Uživatel'}
+                        <span className={`px-2 py-1 text-xs rounded-full font-bold ${u.role == 'admin' ? 'bg-purple-100 text-purple-700' : 'bg-gray-200 text-gray-700'}`}>
+                          {u.role == 'admin' ? 'Admin' : 'Uživatel'}
                         </span>
                       </td>
                       <td className="p-4 text-right">
                         {/* Zobrazíme tlačítko jen pokud není admin a ještě není zabanovaný */}
-                        {!u.is_superuser && u.status !== 'banned' && u.is_active !== false ? (
+                        {u.role != 'admin' && u.is_active !== false ? (
                           <button onClick={() => handleBanUser(u.id)} className="px-3 py-1 text-xs font-bold rounded text-white bg-red-500 hover:bg-red-600 transition shadow-sm">Zabanovat</button>
-                        ) : !u.is_superuser ? (
+                        ) : u.role != 'admin' ? (
                           <span className="text-xs font-bold text-red-500">Zabanován</span>
                         ) : null}
                       </td>

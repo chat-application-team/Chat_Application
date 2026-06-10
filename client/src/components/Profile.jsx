@@ -8,7 +8,7 @@ function Profile({ onClose }) {
     const { user, setUser } = useAuth();
     const [username, setUsername] = useState(user?.username || '');
     const [email, setEmail] = useState(user?.email || '');
-    const [bio, setBio] = useState(user?.bio || ''); // PŘIDÁNO
+    const [bio, setBio] = useState(user.profile?.bio || ''); // PŘIDÁNO
     const [password, setPassword] = useState('');
     const [statusMsg, setStatusMsg] = useState({ text: '', type: '' });
     const [oldPassword, setOldPassword] = useState('');
@@ -19,7 +19,7 @@ function Profile({ onClose }) {
         setStatusMsg({ text: 'Ukládám...', type: 'info' });
 
         try {
-            const updateRes = await userService.updateProfile({ username, email, bio });
+            const updateRes = await userService.updateProfile({ username, email, profile: {bio: bio} });
             if (!updateRes.success) {
               throw new Error(updateRes.message);
             }

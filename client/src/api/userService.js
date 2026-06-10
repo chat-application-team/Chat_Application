@@ -27,12 +27,7 @@ export const userService = {
     try {
         const response = await axiosClient.patch(
         "/api/users/me/update/",
-        data,
-        {
-            headers: {
-            "Content-Type": "multipart/form-data",
-            },
-        }
+        data
         );
 
         return { success: true, data: response.data };
