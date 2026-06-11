@@ -88,16 +88,29 @@ Chat_Application/
 ## Instalace a spuštění (lokální)
 
 ```bash
-git clone <repo-url>
+git clone https://github.com/chat-application-team/Chat_Application.git
+```
+```bash
+# server
 cd server
 
 python -m venv venv
 source venv/bin/activate   # Linux/macOS
 venv\Scripts\activate      # Windows
 
-pip install -r requirements.txt
+pip install -r ../requirements.txt
 
 python manage.py migrate
 python manage.py runserver
 ```
+```bash
+# client
+cd client
+
+npm i
+
+npm run dev
+```
 Backend bude dostupný na http://127.0.0.1:8000/.
+
+Frontend bude dostupný na http://localhost:5173/.
