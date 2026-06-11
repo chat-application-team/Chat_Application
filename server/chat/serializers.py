@@ -1,10 +1,11 @@
 from rest_framework import serializers
 from .models import Chat, ChatMember, Message, Attachment, Notification, Report
-from users.models import CustomUser 
+from users.models import CustomUser
+from users.serializers import calculate_status
 
 class CustomUserSerializer(serializers.ModelSerializer):
     avatar = serializers.SerializerMethodField()
-    status = serializers.CharField(source='profile.status', read_only=True)
+    status = serializers.SerializerMethodField()
 
     class Meta:
         model = CustomUser
@@ -14,6 +15,9 @@ class CustomUserSerializer(serializers.ModelSerializer):
         if hasattr(obj, 'profile') and obj.profile.avatar:
             return obj.profile.avatar.url
         return "/media/avatars/default.png"
+    
+    def get_status(self, obj):
+        return calculate_status(obj)
 
 class AttachmentSerializer(serializers.ModelSerializer):
     class Meta:

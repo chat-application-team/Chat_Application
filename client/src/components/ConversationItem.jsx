@@ -16,10 +16,10 @@ function ConversationItem({ chat, isActive, onClick }) {
     chat.other_user?.profile?.avatar;
 
   const unread = chat.unread_count || chat.unread || 0;
-  const isGroup = chat.is_group || chat.isGroup;
+  const isGroup = chat.type == 'group';
 
   // Pouze pro user chaty
-  const userStatus = chat.status || "offline";
+  const userStatus = chat.other_user?.status || "offline";
 
   return (
     <div

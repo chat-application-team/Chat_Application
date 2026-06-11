@@ -107,24 +107,17 @@ function ChatDashboard() {
     useEffect(() => {
       if (!user?.id) return;
 
-      const setOnline = async () => {
-        const result = await userService.updateStatus("online");
-
+      const interval = setInterval(() => {
+        const result = userService.pingStatus();
         if (result.success) {
           setUser(prev => ({
             ...prev,
             profile: {
               ...prev.profile,
-              status: "online",
+              status: result.status,
             },
           }));
         }
-      };
-
-      setOnline();
-
-      const interval = setInterval(() => {
-        userService.pingStatus();
       }, 120000);
 
       return () => clearInterval(interval);

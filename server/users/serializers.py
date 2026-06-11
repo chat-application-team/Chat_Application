@@ -10,6 +10,20 @@ from django.utils import timezone
 
 from datetime import timedelta
 
+def calculate_status(obj):
+    user = obj.user if isinstance(obj, Profile) else obj
+    if hasattr(user, "profile") and user.profile.status == Profile.DND:
+        return Profile.DND
+    
+    if user.last_login:
+        now = timezone.now()
+        limit_online = timedelta(minutes=5)
+
+        if now - user.last_login < limit_online:
+            return Profile.ONLINE
+        
+    return Profile.OFFLINE
+
 class RegisterSerialzer(serializers.ModelSerializer):
     class Meta:
         model = User
@@ -38,6 +52,7 @@ class RegisterSerialzer(serializers.ModelSerializer):
 
 class ProfileSerializer(serializers.ModelSerializer):
     updated_at = serializers.DateTimeField(format="%d.%m.%Y %H:%M", read_only=True)
+    status = serializers.SerializerMethodField()
 
     class Meta:
         model = Profile
@@ -45,8 +60,12 @@ class ProfileSerializer(serializers.ModelSerializer):
         fields = [
             "bio",
             "avatar",
-            "updated_at"
+            "updated_at",
+            "status"
         ]
+
+    def get_status(self, obj):
+        return calculate_status(obj)
 
 class UserSerializer(serializers.ModelSerializer):
     profile = ProfileSerializer(read_only=True)
@@ -113,17 +132,7 @@ class UserFriendsSerializer(serializers.ModelSerializer):
         ]
 
     def get_status(self, obj):
-        if hasattr(obj, "profile") and obj.profile.status == Profile.DND:
-            return Profile.DND
-        
-        if obj.last_login:
-            now = timezone.now()
-            limit_online = timedelta(minutes=5)
-
-            if now - obj.last_login < limit_online:
-                return Profile.ONLINE
-            
-        return Profile.OFFLINE
+        return calculate_status(obj)
 
 class UserAdminSerializer(serializers.ModelSerializer):
     role_display = serializers.CharField(source="get_role_disply", read_only=True)
@@ -146,7 +155,7 @@ class UserAdminSerializer(serializers.ModelSerializer):
             "last_login"
         ]
 
-class ProfileUpdateSerializer(serializers.ModelSerializer):
+class ProfileUpdateSerializer(serializers.ModelSerializer):  
     class Meta:
         model = Profile
         
@@ -165,7 +174,7 @@ class ProfileUpdateSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(
                 f"Invalid status. Allowed values are only {" or ".join(allowed_statuses)}."
             )
-        
+        print(normalized_value)
         return normalized_value
 
 class UpdateUserSerializer(serializers.ModelSerializer):
@@ -221,7 +230,8 @@ class BlockedUserSerializer(serializers.ModelSerializer):
 
 class PingUserSerializer(serializers.ModelSerializer):
     last_login = serializers.DateTimeField(format="%d.%m.%Y %H.%M:%S", read_only=True)
-    
+    status = serializers.SerializerMethodField()
+
     class Meta:
         model = User
 
@@ -229,7 +239,11 @@ class PingUserSerializer(serializers.ModelSerializer):
             "id",
             "username",
             "last_login",
+            "status"
         ]
+
+    def get_status(self, obj):
+        return calculate_status(obj)
 
 class UserMinifieldSerializer(serializers.ModelSerializer):
     role_display = serializers.CharField(source="get_role_display", read_only=True)
